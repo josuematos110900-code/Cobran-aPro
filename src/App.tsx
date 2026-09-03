@@ -33,7 +33,7 @@ export default function App() {
       <Route
         path="/onboarding"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requireOrganization={false}>
             <OnboardingPage />
           </ProtectedRoute>
         }

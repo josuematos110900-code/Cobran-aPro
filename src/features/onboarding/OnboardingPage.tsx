@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,7 +25,16 @@ const CURRENCIES = [
 
 export function OnboardingPage() {
   const navigate = useNavigate();
-  const { refreshOrganization } = useAuth();
+  const { organization, refreshOrganization } = useAuth();
+
+  // Quem já tem organização (ex: voltou atrás no browser, ou abriu
+  // /onboarding por engano) não deve poder criar uma segunda — segue
+  // logo para o dashboard.
+  useEffect(() => {
+    if (organization) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [organization, navigate]);
 
   const [name, setName] = useState('');
   const [businessType, setBusinessType] = useState(BUSINESS_TYPES[0]);
