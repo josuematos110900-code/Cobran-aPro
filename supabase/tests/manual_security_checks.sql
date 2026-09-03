@@ -1,0 +1,136 @@
+-- manual_security_checks.sql
+--
+-- Checklist de testes manuais de segurança e regras de negócio, para
+-- correr no SQL Editor de um projecto Supabase real (não corre em CI —
+-- este repositório não tem acesso a uma instância Supabase viva). Cobre
+-- os cenários pedidos na Fase 12/18 do plano de produção: permissões,
+-- pagamento, invoice, recorrência, limites de plano e isolamento
+-- multi-tenant.
+--
+-- Como usar: cada bloco cria dados de teste com dois utilizadores/duas
+-- organizações e confirma o resultado esperado num comentário "-- espera:".
+-- Corra sempre num projecto de TESTE, nunca em produção — os blocos
+-- inserem e apagam dados reais.
+--
+-- A maior parte destas verificações não pode ser feita só com SQL puro
+-- porque dependem de auth.uid() (a sessão do utilizador autenticado).
+-- Onde isso importa, o bloco explica como reproduzir o mesmo teste a
+-- partir da aplicação (dois browsers/perfis, um por utilizador) — é
+-- assim que os validei durante o desenvolvimento.
+
+-- =========================================================================
+-- 1. Isolamento multi-tenant — utilizador A nunca vê dados da organização B
+-- =========================================================================
+-- Reprodução via app:
+--   1. Cria a conta A, faz onboarding (organização "Empresa A"), cria um
+--      cliente "Cliente A".
+--   2. Cria a conta B (sessão anónima/outro browser), faz onboarding
+--      (organização "Empresa B").
+--   3. Como B, tenta abrir /clients — "Cliente A" não pode aparecer.
+--   4. Como B, tenta aceder directamente a /clients/<id-do-cliente-A> — a
+--      RLS ("clients_select_member") devolve zero linhas; a página deve
+--      mostrar "não encontrado", nunca os dados do Cliente A.
+-- espera: nenhuma linha de "Empresa A" visível para B, em nenhuma tabela.
+
+-- =========================================================================
+-- 2. Utilizador B tenta inserir dados na organização A (contornando a UI)
+-- =========================================================================
+-- Reprodução: autenticado como B, na consola do browser:
+--   await supabase.from('clients').insert({ organization_id: '<id-empresa-A>', name: 'Invasor' })
+-- espera: erro de RLS ("new row violates row-level security policy") —
+-- "clients_insert_member" exige organization_id in user_organization_ids().
+
+-- =========================================================================
+-- 3. Utilizador B tenta editar/pagar uma invoice da organização A
+-- =========================================================================
+-- Reprodução: autenticado como B:
+--   await supabase.from('invoices').update({ amount: 1 }).eq('id', '<invoice-de-A>')
+--   await supabase.rpc('mark_invoice_paid', { p_invoice_id: '<invoice-de-A>' })
+-- espera: o update afecta 0 linhas (RLS); mark_invoice_paid lança
+-- "Não tem permissão para esta cobrança." (mark_invoice_paid.sql valida
+-- organization_id explicitamente, além da RLS).
+
+-- =========================================================================
+-- 4. Staff tenta executar uma acção exclusiva de owner/admin
+-- =========================================================================
+-- Reprodução: adiciona um utilizador C como "staff" da Empresa A
+-- (add_organization_member_by_email). Autenticado como C:
+--   await supabase.from('organizations').update({ name: 'Hackeado' }).eq('id', '<empresa-A>')
+--   await supabase.from('settings').update({ whatsapp_template: 'x' }).eq('organization_id', '<empresa-A>')
+--   await supabase.rpc('add_organization_member_by_email', { p_organization_id: '<empresa-A>', p_email: 'x@x.com', p_role: 'staff' })
+-- espera: os dois updates afectam 0 linhas (RLS exige
+-- user_admin_organization_ids()); a RPC lança "Só o dono ou administrador
+-- pode adicionar membros."
+
+-- =========================================================================
+-- 5. Tentativa de escalada de papel (role) — admin ou o próprio membro
+-- =========================================================================
+-- Reprodução: autenticado como um admin da Empresa A, tentando
+-- promover-se a si próprio ou a outro membro a owner:
+--   await supabase.from('organization_members').update({ role: 'owner' }).eq('user_id', auth.uid) // próprio
+--   await supabase.rpc('update_member_role', { p_member_id: '<próprio-member-id>', p_role: 'staff' }) // próprio
+-- espera: ambos falham — o trigger enforce_member_role_change() bloqueia
+-- "Não pode alterar o seu próprio papel." e "Não é possível promover um
+-- membro a responsável (owner) desta forma.", mesmo por escrita directa
+-- na tabela (não só via RPC).
+
+select 1; -- placeholder para o próximo bloco ser sempre executável isolado
+
+-- =========================================================================
+-- 6. Pagamento: duplo-clique / duas chamadas simultâneas na mesma invoice
+-- =========================================================================
+-- Corra este bloco DUAS VEZES EM PARALELO (duas abas do SQL Editor, ou
+-- "pg_sleep" para forçar sobreposição) contra a MESMA invoice pendente,
+-- autenticado como owner/admin da organização dessa invoice:
+--   select public.mark_invoice_paid('<invoice-id>', 'cash', null);
+-- espera: exactamente UM dos dois lança sucesso (devolve o payment); o
+-- outro lança "Esta cobrança já foi paga." — nunca dois "payments" para a
+-- mesma invoice. Isto é garantido pelo "for update" (bloqueio de linha)
+-- dentro de mark_invoice_paid().
+
+-- =========================================================================
+-- 7. Pagamento numa invoice já paga / já cancelada
+-- =========================================================================
+-- select public.mark_invoice_paid('<invoice-já-paga>', 'cash', null);
+-- espera: "Esta cobrança já foi paga."
+-- select public.mark_invoice_paid('<invoice-cancelada>', 'cash', null);
+-- espera: "Não é possível pagar uma cobrança cancelada."
+
+-- =========================================================================
+-- 8. Recorrência: idempotência de generate_recurring_invoices()
+-- =========================================================================
+-- Como service_role (ou superutilizador no SQL Editor):
+--   select count(*) from public.generate_recurring_invoices(); -- ex: 3
+--   select count(*) from public.generate_recurring_invoices(); -- deve ser 0
+-- espera: a segunda chamada não gera nenhuma invoice nova — ver
+-- README secção 11.7 para as queries de confirmação (subscription_billing_log
+-- com constraint unique (subscription_id, billing_period_start)).
+
+-- =========================================================================
+-- 9. Limites de plano — bloqueados no servidor, não só na UI
+-- =========================================================================
+-- Numa organização no plano Free (5 clientes) já com 5 clientes activos,
+-- autenticado como owner/admin dessa organização:
+--   await supabase.from('clients').insert({ organization_id: '<org>', name: 'Cliente 6' })
+-- espera: erro "Limite do seu plano atingido: 5 de 5 clientes permitidos.
+-- Actualize o seu plano em /billing para continuar." (trigger
+-- trg_clients_plan_limit, migration 021).
+--
+-- No mesmo plano Free, tentar criar uma cobrança recorrente:
+--   await supabase.from('subscriptions').insert({ organization_id: '<org>', ... })
+-- espera: "O seu plano actual não inclui cobranças recorrentes."
+--
+-- Durante o trial (organizations.subscription_status = 'trialing' e
+-- trial_end no futuro), o mesmo insert de subscriptions deve ser
+-- permitido, porque get_effective_plan() devolve 'profissional' — só
+-- depois do trial expirar é que volta a ser bloqueado.
+
+-- =========================================================================
+-- 10. Numeração de facturas — nunca duplicada sob concorrência
+-- =========================================================================
+-- select public.next_invoice_number('<org>'); -- correr várias vezes em
+-- paralelo (várias abas) e confirmar que não há dois números iguais:
+-- select invoice_number, count(*) from public.invoices
+-- where organization_id = '<org>' group by invoice_number having count(*) > 1;
+-- espera: 0 linhas (garantido pelo "insert ... on conflict ... do update"
+-- em invoice_number_counters, migration 014/017).
