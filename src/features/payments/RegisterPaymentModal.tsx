@@ -96,7 +96,6 @@ export function RegisterPaymentModal({
     return () => {
       isMounted = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, organizationId, values.client_id]);
 
   const selectedInvoice = invoices.find((inv) => inv.id === values.invoice_id) ?? null;

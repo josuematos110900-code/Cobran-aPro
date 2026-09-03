@@ -10,14 +10,17 @@ import {
   Printer,
   Download,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorMessage } from '@/components/ui/ErrorMessage';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
+import { fetchPlanStatus } from '@/features/billing/api';
 import {
   fetchClientsForExport,
   fetchInvoiceStatusBreakdown,
@@ -83,6 +86,7 @@ export function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState<string | null>(null);
+  const [reportsEnabled, setReportsEnabled] = useState<boolean | null>(null);
 
   const { from, to } = computePeriodRange(preset, customFrom, customTo);
 
@@ -130,12 +134,23 @@ export function ReportsPage() {
     setServiceBreakdown(fetchedServices);
     setOverdueTop(fetchedOverdue);
     setLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organization, from, to, granularity]);
 
   useEffect(() => {
+    if (!organization) return;
+    let isMounted = true;
+    fetchPlanStatus(organization.id).then(({ status }) => {
+      if (isMounted) setReportsEnabled(status?.limits.reports_enabled ?? true);
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [organization]);
+
+  useEffect(() => {
+    if (reportsEnabled === false) return;
     load();
-  }, [load]);
+  }, [load, reportsEnabled]);
 
   async function handleExportPayments() {
     if (!organization) return;
@@ -231,6 +246,28 @@ export function ReportsPage() {
       ]
     );
     downloadCsv(`relatorio_${from}_a_${to}.csv`, csv);
+  }
+
+  if (reportsEnabled === false) {
+    return (
+      <AppShell>
+        <div className="mx-auto max-w-6xl p-4 md:p-8">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Relatórios</h1>
+          <Card className="mt-6">
+            <EmptyState
+              icon={Percent}
+              title="Relatórios não incluídos no seu plano"
+              description="Actualize para o plano Básico ou superior para desbloquear relatórios por período, ranking de clientes e exportação CSV."
+            />
+            <div className="mt-4 flex justify-center">
+              <Link to="/billing">
+                <Button>Ver planos</Button>
+              </Link>
+            </div>
+          </Card>
+        </div>
+      </AppShell>
+    );
   }
 
   return (

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/Textarea';
 import { Select } from '@/components/ui/Select';
 import { ErrorMessage } from '@/components/ui/ErrorMessage';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, Copy, Check } from 'lucide-react';
 import { buildWhatsAppLink } from '@/lib/whatsapp';
 import { recordReminder } from './api';
 import {
@@ -72,6 +72,7 @@ export function SendWhatsAppModal({ open, onClose, organizationId, client, mode,
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -137,6 +138,16 @@ export function SendWhatsAppModal({ open, onClose, organizationId, client, mode,
     // no nosso histórico interno.
     window.open(linkResult.url, '_blank');
     onSent?.();
+  }
+
+  async function handleCopyMessage() {
+    try {
+      await navigator.clipboard.writeText(message);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setSaveError('Não foi possível copiar a mensagem. Copie manualmente do campo acima.');
+    }
   }
 
   const title =
@@ -227,6 +238,18 @@ export function SendWhatsAppModal({ open, onClose, organizationId, client, mode,
           onChange={(e) => setMessage(e.target.value)}
           rows={7}
         />
+
+        <Button type="button" variant="secondary" onClick={handleCopyMessage} className="w-full">
+          {copied ? (
+            <>
+              <Check className="h-4 w-4 text-emerald-500" aria-hidden="true" /> Copiado
+            </>
+          ) : (
+            <>
+              <Copy className="h-4 w-4" aria-hidden="true" /> Copiar mensagem
+            </>
+          )}
+        </Button>
 
         <p className="text-xs text-slate-400">
           Ao abrir o WhatsApp, guardamos apenas o registo de que esta mensagem foi preparada e o envio

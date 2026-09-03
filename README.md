@@ -102,13 +102,21 @@ A aplicação fica disponível em `http://localhost:5173`.
 
 ---
 
-## 6. Verificação de tipos e build
+## 6. Verificação de tipos, testes e build
 
 ```bash
 npm run typecheck   # verifica TypeScript sem gerar ficheiros
+npm run lint         # ESLint (flat config)
+npm run test         # testes unitários (Vitest) — validações, WhatsApp, planos
 npm run build        # build de produção (inclui verificação de tipos)
 npm run preview       # pré-visualiza o build de produção localmente
 ```
+
+Ver também `PRODUCTION_CHECKLIST.md` para a lista completa de verificação
+antes do primeiro lançamento comercial, e
+`supabase/tests/manual_security_checks.sql` para os testes de segurança e
+regras de negócio que dependem de uma instância Supabase real (isolamento
+multi-tenant, permissões, pagamento, recorrência, limites de plano).
 
 ---
 
@@ -219,8 +227,18 @@ supabase/
 
 ## 10. Testes
 
-Ainda não existem testes automatizados neste commit inicial. As
-prioridades de teste, conforme o plano do produto, são:
+Testes unitários automatizados (Vitest, `npm run test`) cobrem hoje a
+lógica pura: validação de formulários (clientes/serviços/cobranças),
+normalização de telefone para o link `wa.me`, e consistência dos limites
+de plano apresentados na UI face aos aplicados no servidor. O que
+depende de uma sessão autenticada e de RLS real (permissões,
+isolamento multi-tenant, pagamento atómico, idempotência da recorrência)
+está documentado como checklist executável em
+`supabase/tests/manual_security_checks.sql`, a correr num projecto
+Supabase de teste — não é possível automatizar isto sem uma instância
+Supabase viva.
+
+Prioridades de teste, conforme o plano do produto:
 
 1. Autenticação (login, registo, recuperação de password)
 2. Criação de clientes
