@@ -45,15 +45,26 @@ existir no frontend.
 ### 3.2. Aplicar as migrations
 
 As migrations estão em `supabase/migrations/`, numeradas por ordem de
-execução (`001_...` a `024_...`). Existem duas formas de as aplicar:
+execução (`001_...` a `024_...`). Existem três formas de as aplicar:
 
-**Opção A — Editor SQL do painel Supabase (mais simples):**
+**Opção A — Um único ficheiro (mais rápido, projecto novo/vazio):**
+
+1. Abra **SQL Editor** no painel do seu projecto Supabase.
+2. Copie todo o conteúdo de [`supabase/schema_full.sql`](./supabase/schema_full.sql)
+   (as 24 migrations já concatenadas pela ordem certa) e cole numa
+   query nova.
+3. Clique **Run**.
+
+Só usar num projecto Supabase que ainda não tenha nenhuma destas
+tabelas — não é pensado para aplicar por cima de um schema parcial.
+
+**Opção B — Editor SQL, ficheiro a ficheiro (mais controlo):**
 
 1. Abra **SQL Editor** no painel do seu projecto.
-2. Copie e execute o conteúdo de cada ficheiro, na ordem numérica
-   (001 → 024).
+2. Copie e execute o conteúdo de cada ficheiro em `supabase/migrations/`,
+   na ordem numérica (001 → 024).
 
-**Opção B — Supabase CLI (recomendado para equipas):**
+**Opção C — Supabase CLI (recomendado para equipas):**
 
 ```bash
 supabase login
