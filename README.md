@@ -45,13 +45,13 @@ existir no frontend.
 ### 3.2. Aplicar as migrations
 
 As migrations estão em `supabase/migrations/`, numeradas por ordem de
-execução (`001_...` a `028_...`). Existem três formas de as aplicar:
+execução (`001_...` a `029_...`). Existem três formas de as aplicar:
 
 **Opção A — Um único ficheiro (mais rápido, projecto novo/vazio):**
 
 1. Abra **SQL Editor** no painel do seu projecto Supabase.
 2. Copie todo o conteúdo de [`supabase/schema_full.sql`](./supabase/schema_full.sql)
-   (as 28 migrations já concatenadas pela ordem certa) e cole numa
+   (as 29 migrations já concatenadas pela ordem certa) e cole numa
    query nova.
 3. Clique **Run**.
 
@@ -62,7 +62,7 @@ tabelas — não é pensado para aplicar por cima de um schema parcial.
 
 1. Abra **SQL Editor** no painel do seu projecto.
 2. Copie e execute o conteúdo de cada ficheiro em `supabase/migrations/`,
-   na ordem numérica (001 → 028).
+   na ordem numérica (001 → 029).
 
 **Opção C — Supabase CLI (recomendado para equipas):**
 
@@ -733,3 +733,26 @@ password protection" em **Authentication → Providers → Email** no
 painel do Supabase (verifica a palavra-passe contra fugas conhecidas via
 HaveIBeenPwned) — é uma definição do serviço de Auth, não da base de
 dados.
+
+## 15. Bug real encontrado ao testar o onboarding (migration 029)
+
+Ao testar a criação da primeira organização com um utilizador real,
+o passo falhava sempre com `new row violates row-level security policy
+for table "organizations"` (código Postgres `42501`), mesmo com uma
+sessão válida e correctamente autenticada.
+
+**Causa:** `OnboardingPage.tsx` fazia dois `insert` separados —
+primeiro em `organizations` (pedindo a linha de volta com `.select()`),
+depois em `organization_members`. A política de leitura de
+`organizations` só permite ver organizações onde o utilizador **já é
+membro** — e nesse instante ainda não é (o segundo insert só acontece a
+seguir). O Postgres recusa a operação inteira quando o `RETURNING` de
+um `INSERT` não passa na política de leitura, não é um problema de
+sessão/token.
+
+**Correcção:** `create_organization_with_owner()` (migration `029`) faz
+os dois inserts numa única transacção atómica, como `security definer`
+— nunca fica uma organização "órfã" sem responsável, e evita por
+completo o conflito entre `INSERT ... RETURNING` e a política de
+leitura. `OnboardingPage.tsx` passou a chamar esta RPC em vez de dois
+inserts directos.

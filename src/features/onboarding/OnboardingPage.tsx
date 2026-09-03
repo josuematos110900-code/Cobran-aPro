@@ -47,38 +47,21 @@ export function OnboardingPage() {
     setError(null);
     setLoading(true);
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      setLoading(false);
-      setError('Sessão expirada. Inicie sessão novamente.');
-      return;
-    }
-
-    const { data: org, error: orgError } = await supabase
-      .from('organizations')
-      .insert({ name, business_type: businessType, currency })
-      .select()
-      .single();
-
-    if (orgError || !org) {
-      setLoading(false);
-      setError('Não foi possível criar a sua empresa. Tente novamente.');
-      return;
-    }
-
-    const { error: memberError } = await supabase.from('organization_members').insert({
-      organization_id: org.id,
-      user_id: user.id,
-      role: 'owner',
+    // create_organization_with_owner() cria a empresa e associa o
+    // utilizador como "owner" numa única transacção atómica no servidor
+    // — nunca fica uma empresa "órfã" sem responsável a meio caminho, e
+    // evita o problema de RLS de tentar ler de volta uma organização
+    // antes de o utilizador ainda ser membro dela.
+    const { error: rpcError } = await supabase.rpc('create_organization_with_owner', {
+      p_name: name,
+      p_business_type: businessType,
+      p_currency: currency,
     });
 
     setLoading(false);
 
-    if (memberError) {
-      setError('Empresa criada, mas houve um problema ao associá-la à sua conta.');
+    if (rpcError) {
+      setError(rpcError.message || 'Não foi possível criar a sua empresa. Tente novamente.');
       return;
     }
 
