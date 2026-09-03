@@ -135,6 +135,36 @@ já que toda a lógica de negócio crítica corre no Postgres (via RLS,
 triggers e funções) ou no frontend, dentro dos limites de segurança do
 Supabase.
 
+### 7.1. Deploy no Netlify
+
+O ficheiro `netlify.toml` incluído já define o build e o redirect
+necessário para o SPA routing — não precisa de configurar nada disso
+manualmente no painel.
+
+1. Faça push do repositório para o GitHub/GitLab/Bitbucket.
+2. Em [app.netlify.com](https://app.netlify.com), **Add new site → Import
+   an existing project**, escolha o repositório e a branch
+   (`claude/cobrancapro-v1-production` ou a que tiver feito merge para
+   `main`).
+3. O Netlify lê `netlify.toml` automaticamente: **Build command**
+   `npm run build`, **Publish directory** `dist`. Não altere isto — se o
+   assistente do Netlify sugerir outro valor, confirme que fica exactamente
+   `npm run build` / `dist`, senão o site fica a servir os ficheiros fonte
+   (`.tsx`) em vez do build, e a app não arranca (erro de "MIME type" no
+   browser, exactamente como abrir o `index.html` directamente).
+4. Em **Site configuration → Environment variables**, adicione
+   `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` com os valores do seu
+   projecto Supabase.
+5. **Deploy site.** Depois de qualquer alteração às variáveis de
+   ambiente, é preciso disparar um novo deploy (**Deploys → Trigger
+   deploy**) — o Netlify não aplica variáveis novas a um build já feito.
+
+Se preferir testar rapidamente sem ligar o Git: corra `npm run build`
+localmente e arraste a pasta `dist/` gerada para
+[app.netlify.com/drop](https://app.netlify.com/drop) — nunca arraste o
+repositório inteiro nem o `index.html` sozinho, só o conteúdo de `dist/`
+depois do build.
+
 ---
 
 ## 8. Configuração de produção — pontos de atenção
