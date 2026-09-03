@@ -1,5 +1,5 @@
 -- schema_full.sql — gerado automaticamente por concatenação de
--- 001_extensions_and_helpers.sql até 024_dashboard_extra_stats.sql,
+-- 001_extensions_and_helpers.sql até 028_revoke_public_grant_authenticated.sql,
 -- pela ordem numérica. NÃO editar directamente — para alterar o
 -- schema, edite a migration individual correspondente em
 -- supabase/migrations/ e regenere este ficheiro.
@@ -7,7 +7,8 @@
 -- Uso: copie todo o conteúdo e cole de uma vez no SQL Editor de um
 -- projecto Supabase NOVO (ainda sem nenhuma destas tabelas), depois
 -- clique Run. Não corra isto num projecto que já tenha algumas
--- destas migrations aplicadas parcialmente sem rever primeiro.
+-- destas migrations aplicadas parcialmente sem rever primeiro —
+-- use supabase/reset_public_schema.sql antes, se for esse o caso.
 
 
 -- =======================================================================
@@ -2527,3 +2528,289 @@ as $$
   order by i.due_date desc
   limit greatest(1, least(p_limit, 50));
 $$;
+
+-- =======================================================================
+-- 025_fix_security_definer_views.sql
+-- =======================================================================
+-- 025_fix_security_definer_views.sql
+-- CRÍTICO: no Postgres 15+, uma view criada sem "security_invoker = true"
+-- corre com as permissões do DONO da view (normalmente "postgres", que
+-- ignora RLS), não do utilizador que a consulta — o oposto do que os
+-- comentários das migrations 012/013/018/019 assumiam ("security invoker
+-- por omissão"). Isto permitia, por exemplo, que um utilizador
+-- autenticado consultasse dashboard_totals de QUALQUER organização, não
+-- só da sua — descoberto via `mcp__Supabase__get_advisors` (lint
+-- security_definer_view) depois de aplicar o schema num projecto real
+-- em Postgres 17. Corrigido para as 4 views existentes.
+
+alter view public.dashboard_totals set (security_invoker = true);
+alter view public.client_balances set (security_invoker = true);
+alter view public.payment_totals set (security_invoker = true);
+alter view public.reminder_totals set (security_invoker = true);
+
+-- =======================================================================
+-- 026_revoke_anon_and_harden_plan_functions.sql
+-- =======================================================================
+-- 026_revoke_anon_and_harden_plan_functions.sql
+-- get_effective_plan() e get_organization_usage() não validavam que o
+-- chamador pertence à organização pedida (só get_plan_status() o fazia).
+-- Um utilizador autenticado de qualquer organização podia, por chamada
+-- directa à RPC, ver o plano e a utilização (nº de clientes, membros,
+-- cobranças do mês) de QUALQUER outra organização. Corrigido aqui.
+create or replace function public.get_effective_plan(p_organization_id uuid)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_org public.organizations%rowtype;
+begin
+  if p_organization_id not in (select public.user_organization_ids()) then
+    raise exception 'Não tem permissão para consultar esta organização.' using errcode = '42501';
+  end if;
+
+  select * into v_org from public.organizations where id = p_organization_id;
+  if not found then
+    raise exception 'Organização não encontrada.' using errcode = 'P0002';
+  end if;
+
+  if v_org.subscription_status = 'trialing' and v_org.trial_end is not null and v_org.trial_end > now() then
+    return 'profissional';
+  end if;
+
+  return v_org.plan;
+end;
+$$;
+
+create or replace function public.get_organization_usage(p_organization_id uuid)
+returns table (
+  clients_count integer,
+  services_count integer,
+  members_count integer,
+  invoices_this_month integer
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if p_organization_id not in (select public.user_organization_ids()) then
+    raise exception 'Não tem permissão para consultar esta organização.' using errcode = '42501';
+  end if;
+
+  return query
+  select
+    (select count(*)::integer from public.clients where organization_id = p_organization_id and status <> 'archived'),
+    (select count(*)::integer from public.services where organization_id = p_organization_id),
+    (select count(*)::integer from public.organization_members where organization_id = p_organization_id),
+    (select count(*)::integer from public.invoices
+       where organization_id = p_organization_id
+         and date_trunc('month', created_at) = date_trunc('month', now()));
+end;
+$$;
+
+create or replace function public.enforce_plan_limit(p_organization_id uuid, p_resource text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_plan text;
+  v_limits record;
+  v_usage record;
+  v_current integer;
+  v_max integer;
+  v_label text;
+begin
+  v_plan := public.get_effective_plan(p_organization_id);
+  select * into v_limits from public.plan_limits(v_plan);
+  select * into v_usage from public.get_organization_usage(p_organization_id);
+
+  case p_resource
+    when 'clients' then
+      v_current := v_usage.clients_count; v_max := v_limits.max_clients; v_label := 'clientes';
+    when 'services' then
+      v_current := v_usage.services_count; v_max := v_limits.max_services; v_label := 'serviços';
+    when 'members' then
+      v_current := v_usage.members_count; v_max := v_limits.max_members; v_label := 'membros da equipa';
+    when 'invoices' then
+      v_current := v_usage.invoices_this_month; v_max := v_limits.max_invoices_per_month; v_label := 'cobranças este mês';
+    else
+      return;
+  end case;
+
+  if v_max is not null and v_current >= v_max then
+    raise exception
+      'Limite do seu plano atingido: % de % % permitidos. Actualize o seu plano em /billing para continuar.',
+      v_current, v_max, v_label
+      using errcode = 'P0001', hint = 'plan_limit_reached';
+  end if;
+end;
+$$;
+
+-- next_invoice_number(): a relaxação para service_role ("auth.uid() is
+-- not null and ...") também deixava passar qualquer chamada com
+-- auth.uid() nulo — incluindo "anon" sem sessão nenhuma. Verifica-se
+-- agora explicitamente o papel de service_role.
+create or replace function public.next_invoice_number(p_organization_id uuid)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_next integer;
+begin
+  if auth.role() <> 'service_role' and p_organization_id not in (select public.user_organization_ids()) then
+    raise exception 'Não pertence a esta organização.' using errcode = '42501';
+  end if;
+
+  insert into public.invoice_number_counters (organization_id, last_number)
+  values (p_organization_id, 1)
+  on conflict (organization_id)
+  do update set last_number = public.invoice_number_counters.last_number + 1
+  returning last_number into v_next;
+
+  return 'FAT-' || lpad(v_next::text, 6, '0');
+end;
+$$;
+
+revoke execute on function public.next_invoice_number(uuid) from public, anon;
+grant execute on function public.next_invoice_number(uuid) to authenticated, service_role;
+
+-- =======================================================================
+-- 027_search_path_and_anon_revoke.sql
+-- =======================================================================
+-- 027_search_path_and_anon_revoke.sql
+-- Fixa search_path em todas as funções que ainda não o tinham (protecção
+-- contra hijacking de schema).
+alter function public.assert_report_access(uuid, date, date) set search_path = public;
+alter function public.compute_next_billing_date(date, smallint, text, date) set search_path = public;
+alter function public.enforce_invoice_status_transition() set search_path = public;
+alter function public.enforce_member_role_change() set search_path = public;
+alter function public.get_recent_overdue_invoices(uuid, integer) set search_path = public;
+alter function public.handle_new_organization_trial() set search_path = public;
+alter function public.plan_limits(text) set search_path = public;
+alter function public.report_invoice_status_breakdown(uuid, date, date) set search_path = public;
+alter function public.report_overdue_top(uuid, integer) set search_path = public;
+alter function public.report_revenue_series(uuid, date, date, text) set search_path = public;
+alter function public.report_service_breakdown(uuid, date, date) set search_path = public;
+alter function public.report_summary(uuid, date, date) set search_path = public;
+alter function public.report_top_clients(uuid, date, date, integer) set search_path = public;
+alter function public.set_subscription_next_billing_date() set search_path = public;
+alter function public.set_updated_at() set search_path = public;
+alter function public.trg_enforce_clients_limit() set search_path = public;
+alter function public.trg_enforce_invoices_limit() set search_path = public;
+alter function public.trg_enforce_members_limit() set search_path = public;
+alter function public.trg_enforce_services_limit() set search_path = public;
+alter function public.trial_duration_days() set search_path = public;
+
+-- Revoga EXECUTE de "anon" explicitamente, função a função (ver
+-- 028_revoke_public_grant_authenticated.sql: revogar só de "anon" não
+-- chega para estas funções — nunca tinham "revoke ... from public" e
+-- por isso continuavam acessíveis via o pseudo-papel PUBLIC).
+revoke execute on function public.add_organization_member_by_email(uuid, text, text) from anon;
+revoke execute on function public.assert_report_access(uuid, date, date) from anon;
+revoke execute on function public.compute_next_billing_date(date, smallint, text, date) from anon;
+revoke execute on function public.enforce_invoice_status_transition() from anon;
+revoke execute on function public.enforce_member_role_change() from anon;
+revoke execute on function public.enforce_plan_limit(uuid, text) from anon;
+revoke execute on function public.get_effective_plan(uuid) from anon;
+revoke execute on function public.get_organization_usage(uuid) from anon;
+revoke execute on function public.get_plan_status(uuid) from anon;
+revoke execute on function public.get_recent_overdue_invoices(uuid, integer) from anon;
+revoke execute on function public.handle_new_organization_settings() from anon;
+revoke execute on function public.handle_new_organization_trial() from anon;
+revoke execute on function public.handle_new_user() from anon;
+revoke execute on function public.handle_payment_marks_invoice_paid() from anon;
+revoke execute on function public.list_organization_members(uuid) from anon;
+revoke execute on function public.mark_invoice_paid(uuid, text, text, timestamptz, text) from anon;
+revoke execute on function public.next_invoice_number(uuid) from anon;
+revoke execute on function public.remove_organization_member(uuid) from anon;
+revoke execute on function public.report_invoice_status_breakdown(uuid, date, date) from anon;
+revoke execute on function public.report_overdue_top(uuid, integer) from anon;
+revoke execute on function public.report_revenue_series(uuid, date, date, text) from anon;
+revoke execute on function public.report_service_breakdown(uuid, date, date) from anon;
+revoke execute on function public.report_summary(uuid, date, date) from anon;
+revoke execute on function public.report_top_clients(uuid, date, date, integer) from anon;
+revoke execute on function public.request_plan_upgrade(uuid, text, text, text) from anon;
+revoke execute on function public.set_subscription_next_billing_date() from anon;
+revoke execute on function public.set_updated_at() from anon;
+revoke execute on function public.trg_enforce_clients_limit() from anon;
+revoke execute on function public.trg_enforce_invoices_limit() from anon;
+revoke execute on function public.trg_enforce_members_limit() from anon;
+revoke execute on function public.trg_enforce_recurring_enabled() from anon;
+revoke execute on function public.trg_enforce_services_limit() from anon;
+revoke execute on function public.trial_duration_days() from anon;
+revoke execute on function public.update_member_role(uuid, text) from anon;
+revoke execute on function public.user_admin_organization_ids() from anon;
+revoke execute on function public.user_organization_ids() from anon;
+
+-- =======================================================================
+-- 028_revoke_public_grant_authenticated.sql
+-- =======================================================================
+-- 028_revoke_public_grant_authenticated.sql
+-- A causa raiz do problema em 027: estas funções nunca tiveram
+-- "revoke ... from public" nas migrations que as criaram, por isso o
+-- EXECUTE concedido por omissão ao pseudo-papel PUBLIC (que todo o papel,
+-- incluindo "anon", herda) nunca foi fechado — revogar apenas de "anon"
+-- não chega enquanto PUBLIC ainda tiver o grant. Fecha-se aqui em PUBLIC
+-- e reabre-se apenas para "authenticated" onde é mesmo necessário:
+--   - user_organization_ids()/user_admin_organization_ids() são chamadas
+--     dentro das próprias políticas RLS quando um utilizador autenticado
+--     consulta qualquer tabela;
+--   - os report_* são RPCs chamadas directamente pelo frontend;
+--   - compute_next_billing_date()/assert_report_access() são chamadas
+--     internamente a partir de funções "security invoker".
+-- As funções que só servem de trigger (enforce_invoice_status_transition,
+-- enforce_member_role_change, handle_new_organization_settings,
+-- handle_new_organization_trial, handle_new_user,
+-- handle_payment_marks_invoice_paid, set_subscription_next_billing_date,
+-- set_updated_at, trg_enforce_*) ficam sem grant nenhum, de propósito —
+-- o mecanismo de triggers do Postgres invoca-as internamente sem
+-- verificar o privilégio EXECUTE de quem despoletou o trigger, e chamá-
+-- las directamente por RPC falha sempre com "trigger functions can only
+-- be called as triggers", independentemente de qualquer grant.
+revoke execute on function public.assert_report_access(uuid, date, date) from public;
+revoke execute on function public.compute_next_billing_date(date, smallint, text, date) from public;
+revoke execute on function public.enforce_invoice_status_transition() from public;
+revoke execute on function public.enforce_member_role_change() from public;
+revoke execute on function public.enforce_plan_limit(uuid, text) from public;
+revoke execute on function public.get_recent_overdue_invoices(uuid, integer) from public;
+revoke execute on function public.handle_new_organization_settings() from public;
+revoke execute on function public.handle_new_organization_trial() from public;
+revoke execute on function public.handle_new_user() from public;
+revoke execute on function public.handle_payment_marks_invoice_paid() from public;
+revoke execute on function public.report_invoice_status_breakdown(uuid, date, date) from public;
+revoke execute on function public.report_overdue_top(uuid, integer) from public;
+revoke execute on function public.report_revenue_series(uuid, date, date, text) from public;
+revoke execute on function public.report_service_breakdown(uuid, date, date) from public;
+revoke execute on function public.report_summary(uuid, date, date) from public;
+revoke execute on function public.report_top_clients(uuid, date, date, integer) from public;
+revoke execute on function public.set_subscription_next_billing_date() from public;
+revoke execute on function public.set_updated_at() from public;
+revoke execute on function public.trg_enforce_clients_limit() from public;
+revoke execute on function public.trg_enforce_invoices_limit() from public;
+revoke execute on function public.trg_enforce_members_limit() from public;
+revoke execute on function public.trg_enforce_recurring_enabled() from public;
+revoke execute on function public.trg_enforce_services_limit() from public;
+revoke execute on function public.trial_duration_days() from public;
+revoke execute on function public.user_admin_organization_ids() from public;
+revoke execute on function public.user_organization_ids() from public;
+
+grant execute on function public.assert_report_access(uuid, date, date) to authenticated;
+grant execute on function public.compute_next_billing_date(date, smallint, text, date) to authenticated;
+grant execute on function public.get_recent_overdue_invoices(uuid, integer) to authenticated;
+grant execute on function public.report_invoice_status_breakdown(uuid, date, date) to authenticated;
+grant execute on function public.report_overdue_top(uuid, integer) to authenticated;
+grant execute on function public.report_revenue_series(uuid, date, date, text) to authenticated;
+grant execute on function public.report_service_breakdown(uuid, date, date) to authenticated;
+grant execute on function public.report_summary(uuid, date, date) to authenticated;
+grant execute on function public.report_top_clients(uuid, date, date, integer) to authenticated;
+grant execute on function public.trial_duration_days() to authenticated;
+grant execute on function public.user_admin_organization_ids() to authenticated;
+grant execute on function public.user_organization_ids() to authenticated;

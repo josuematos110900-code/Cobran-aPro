@@ -45,13 +45,13 @@ existir no frontend.
 ### 3.2. Aplicar as migrations
 
 As migrations estão em `supabase/migrations/`, numeradas por ordem de
-execução (`001_...` a `024_...`). Existem três formas de as aplicar:
+execução (`001_...` a `028_...`). Existem três formas de as aplicar:
 
 **Opção A — Um único ficheiro (mais rápido, projecto novo/vazio):**
 
 1. Abra **SQL Editor** no painel do seu projecto Supabase.
 2. Copie todo o conteúdo de [`supabase/schema_full.sql`](./supabase/schema_full.sql)
-   (as 24 migrations já concatenadas pela ordem certa) e cole numa
+   (as 28 migrations já concatenadas pela ordem certa) e cole numa
    query nova.
 3. Clique **Run**.
 
@@ -62,7 +62,7 @@ tabelas — não é pensado para aplicar por cima de um schema parcial.
 
 1. Abra **SQL Editor** no painel do seu projecto.
 2. Copie e execute o conteúdo de cada ficheiro em `supabase/migrations/`,
-   na ordem numérica (001 → 024).
+   na ordem numérica (001 → 028).
 
 **Opção C — Supabase CLI (recomendado para equipas):**
 
@@ -699,3 +699,37 @@ Regras impostas no **Postgres**, não só na interface (migration
   (procurada por email); não existe convite por email nesta versão.
 
 ---
+
+## 14. Auditoria de segurança pós-deploy (migrations 025-028)
+
+Depois de aplicar o schema pela primeira vez num projecto Supabase real
+(Postgres 17), corri `mcp__Supabase__get_advisors` (linter de segurança
+nativo do Supabase) e encontrei — e corrigi de imediato — dois problemas
+reais que não apareciam ao rever o SQL isoladamente:
+
+- **Views "security definer" por omissão** (`dashboard_totals`,
+  `client_balances`, `payment_totals`, `reminder_totals`): no Postgres 15+,
+  uma view sem `security_invoker = true` corre com os privilégios do
+  DONO da view, não do utilizador que a consulta — o oposto do que os
+  comentários originais destas views assumiam ("comportamento por
+  omissão"). Um utilizador autenticado conseguia, por esta via, ver
+  totais de **qualquer** organização, não só da sua. Corrigido em
+  `025_fix_security_definer_views.sql`.
+- **Funções acessíveis por `anon`** (sem sessão nenhuma): o projecto
+  Supabase concede `EXECUTE` a `anon`/`authenticated` por omissão em
+  toda a função nova do schema `public`; as migrations originais só
+  fechavam isto explicitamente nalgumas RPCs. Corrigido função a função
+  em `026`-`028` — hoje só `plan_limits()` é mesmo pública; tudo o resto
+  exige sessão autenticada (e, mesmo assim, valida sempre a pertença à
+  organização dentro da própria função, nunca confiando só no grant).
+
+Sempre que alterar RPCs ou views neste projecto, corra
+`mcp__Supabase__get_advisors` (tipo `security`) depois de aplicar a
+migration — é a única forma fiável de apanhar este tipo de problema,
+que não aparece a rever o SQL a olho.
+
+**Pendente, fora do alcance de uma migration SQL:** activar "Leaked
+password protection" em **Authentication → Providers → Email** no
+painel do Supabase (verifica a palavra-passe contra fugas conhecidas via
+HaveIBeenPwned) — é uma definição do serviço de Auth, não da base de
+dados.
