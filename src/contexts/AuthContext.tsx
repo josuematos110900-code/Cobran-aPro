@@ -7,12 +7,14 @@ import {
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import type { Organization } from '@/lib/types/database';
+import type { Organization, OrgMemberRole } from '@/lib/types/database';
 
 interface AuthContextValue {
   session: Session | null;
   user: User | null;
   organization: Organization | null;
+  memberRole: OrgMemberRole | null;
+  isAdmin: boolean;
   loading: boolean;
   refreshOrganization: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -23,6 +25,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
+  const [memberRole, setMemberRole] = useState<OrgMemberRole | null>(null);
   const [loading, setLoading] = useState(true);
 
   async function loadOrganizationForUser() {
@@ -38,10 +41,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) {
       console.error('Erro ao carregar organização:', error.message);
       setOrganization(null);
+      setMemberRole(null);
       return;
     }
 
-    setOrganization(data as Organization | null);
+    const org = data as Organization | null;
+    setOrganization(org);
+
+    if (org) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        const { data: memberRow } = await supabase
+          .from('organization_members')
+          .select('role')
+          .eq('organization_id', org.id)
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        setMemberRole((memberRow?.role as OrgMemberRole | undefined) ?? null);
+      }
+    } else {
+      setMemberRole(null);
+    }
   }
 
   async function refreshOrganization() {
@@ -72,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await loadOrganizationForUser();
         } else {
           setOrganization(null);
+          setMemberRole(null);
         }
       }
     );
@@ -85,12 +110,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function signOut() {
     await supabase.auth.signOut();
     setOrganization(null);
+    setMemberRole(null);
   }
 
   const value: AuthContextValue = {
     session,
     user: session?.user ?? null,
     organization,
+    memberRole,
+    isAdmin: memberRole === 'owner' || memberRole === 'admin',
     loading,
     refreshOrganization,
     signOut,

@@ -45,13 +45,13 @@ existir no frontend.
 ### 3.2. Aplicar as migrations
 
 As migrations estão em `supabase/migrations/`, numeradas por ordem de
-execução (`001_...` a `017_...`). Existem duas formas de as aplicar:
+execução (`001_...` a `024_...`). Existem duas formas de as aplicar:
 
 **Opção A — Editor SQL do painel Supabase (mais simples):**
 
 1. Abra **SQL Editor** no painel do seu projecto.
 2. Copie e execute o conteúdo de cada ficheiro, na ordem numérica
-   (001 → 017).
+   (001 → 024).
 
 **Opção B — Supabase CLI (recomendado para equipas):**
 
@@ -173,9 +173,7 @@ Supabase.
   Business API — isso fica preparado como trabalho futuro, a implementar
   num serviço de backend próprio.
 - **Planos e billing:** os limites de cada plano (FREE/BÁSICO/
-  PROFISSIONAL/EMPRESA) ainda não são impostos automaticamente pelo
-  sistema — a coluna `organizations.plan` existe, mas a validação de
-  limites (nº de clientes, cobranças/mês) fica para uma etapa seguinte.
+  PROFISSIONAL/EMPRESA) são impostos no servidor — ver secção 12.
 
 ---
 
@@ -198,8 +196,14 @@ src/
                      cancelar, listagem com próxima data de cobrança
     invoices/       Lista com filtros/totais, criar/editar, marcar como
                      pago (RPC atómica), cancelar, lembrete via WhatsApp
-    payments/, reminders/, reports/, settings/   (ainda por implementar)
-  contexts/      AuthContext (sessão + organização activa), ToastContext
+    payments/       Registo de pagamentos (RPC atómica), recibo, histórico
+    reminders/      Envio de lembretes via WhatsApp (wa.me), histórico
+    reports/        Relatórios por período, ranking de clientes/serviços,
+                     exportação CSV
+    settings/       Dados da empresa, modelo de WhatsApp, gestão de membros
+    billing/        Plano actual, utilização face aos limites, upgrade
+  contexts/      AuthContext (sessão + organização activa + papel do
+                 utilizador), ToastContext
   routes/        ProtectedRoute
   lib/           Cliente Supabase, tipos, tradução de erros de auth,
                  utilitário de link WhatsApp (wa.me)
@@ -523,3 +527,116 @@ having count(*) > 1;
   `end_expired_subscriptions`) — não expõe nenhum outro endpoint nem
   aceita parâmetros do chamador que influenciem o que é executado.
 
+
+---
+
+## 12. Planos, trial e assinatura
+
+Implementado nas migrations `021_plans_trial_and_limits.sql`,
+`022_member_management_and_settings.sql`, `023_organization_contact_info.sql`
+e `024_dashboard_extra_stats.sql`.
+
+### 12.1. Planos
+
+Quatro planos comerciais — **Free, Básico, Profissional, Empresa** — com
+limites definidos numa única fonte de verdade no servidor: a função SQL
+`plan_limits(plan)`. O frontend (`src/lib/plans.ts`) só espelha estes
+valores para apresentação (preços, nomes, benefícios) — **nunca é ele que
+decide se uma ação é permitida.**
+
+| Limite | Free | Básico | Profissional | Empresa |
+|---|---|---|---|---|
+| Clientes | 5 | 30 | 150 | ilimitado |
+| Serviços | 3 | 15 | 50 | ilimitado |
+| Membros da equipa | 1 | 3 | 8 | ilimitado |
+| Cobranças/mês | 10 | 60 | 300 | ilimitado |
+| Cobranças recorrentes | ❌ | ✅ | ✅ | ✅ |
+| Relatórios | ❌ | ✅ | ✅ | ✅ |
+
+A aplicação destes limites é feita por **triggers `before insert`** nas
+tabelas `clients`, `services`, `invoices`, `organization_members` e
+`subscriptions` — mesmo que alguém contorne a interface e escreva
+directamente via `supabase-js`, a base de dados rejeita a operação com uma
+mensagem de erro amigável (ex: *"Limite do seu plano atingido: 5 de 5
+clientes permitidos."*). O frontend só usa estes limites para desenhar
+barras de utilização e desactivar botões preventivamente — a garantia real
+está sempre no Postgres.
+
+A RPC `get_plan_status(organization_id)` devolve, numa só chamada, o plano
+actual, o plano "efectivo" (ver 12.2), o estado do trial, os limites e a
+utilização actual — é o que alimenta o Dashboard e a página `/billing`.
+
+### 12.2. Trial gratuito
+
+Toda a organização nova arranca com `subscription_status = 'trialing'` e
+usufrui, durante o trial, dos limites do plano **Profissional** mesmo que
+`organizations.plan` continue `'free'` (é o "plano efectivo" — ver função
+`get_effective_plan()`). A duração do trial está centralizada numa única
+função, `trial_duration_days()` (14 dias por omissão) — para a alterar,
+basta editar essa função.
+
+Findo o trial, a organização volta automaticamente ao plano realmente
+contratado (`organizations.plan`, `'free'` por omissão) — nenhum dado é
+apagado, só deixam de se aplicar os limites alargados do Profissional.
+
+### 12.3. Assinatura e activação
+
+`organizations` tem os campos `subscription_status`, `billing_period`,
+`started_at`, `expires_at`, `cancelled_at`, `provider` e
+`external_reference`, prontos para qualquer gateway de pagamento futuro.
+
+**Não existe hoje, para Angola, um gateway de pagamento com API/webhook
+público e fiável integrado neste projecto** — por isso o fluxo de upgrade
+é: o utilizador (owner/admin) pede um plano em `/billing`
+(`request_plan_upgrade`, que regista uma linha em `purchase_intents` com
+`status = 'pending'`), a página mostra um link de WhatsApp opcional
+(`VITE_SALES_WHATSAPP_NUMBER`) para combinar o pagamento, e **a activação
+é manual**: quem gere o SaaS confirma o pagamento e corre, no SQL Editor
+do Supabase (com a `service_role`, nunca pelo frontend):
+
+```sql
+update public.purchase_intents set status = 'confirmed', confirmed_at = now() where id = '...';
+update public.organizations
+set plan = 'profissional', subscription_status = 'active', started_at = now(), expires_at = now() + interval '30 days'
+where id = '...';
+```
+
+A arquitectura fica pronta para automatizar isto mais tarde — bastaria um
+webhook do gateway escolhido a fazer o mesmo `update`, sem alterar mais
+nada no resto da aplicação.
+
+---
+
+## 13. Papéis e permissões (owner / admin / staff)
+
+| | Owner | Admin | Staff |
+|---|---|---|---|
+| Clientes, serviços, cobranças, pagamentos, lembretes | ✅ | ✅ | ✅ |
+| Ver relatórios | ✅ | ✅ | ✅ |
+| Editar dados da empresa e modelo de WhatsApp (`/settings`) | ✅ | ✅ | ❌ (só leitura) |
+| Adicionar/remover membros, alterar papéis | ✅ | ✅ | ❌ |
+| Pedir upgrade de plano (`/billing`) | ✅ | ✅ | ❌ |
+| Ser removido da organização | nunca | por outro admin/owner | por admin/owner ou a si próprio |
+| Alterar o seu próprio papel | ❌ (ninguém pode) | ❌ | ❌ |
+
+Regras impostas no **Postgres**, não só na interface (migration
+`022_member_management_and_settings.sql`):
+
+- Só pode existir **um owner** por organização — é sempre quem criou a
+  organização no onboarding; não existe (ainda) transferência de
+  titularidade.
+- Um trigger em `organization_members` (`enforce_member_role_change`)
+  bloqueia, para qualquer via de escrita (RPC ou tabela directa):
+  promover alguém a `owner`, alterar o papel de quem já é `owner`, e um
+  utilizador alterar o seu **próprio** papel — fecha uma escalada de
+  privilégios que a política de RLS da migration `003` sozinha não
+  impedia.
+- A gestão de membros em `/settings` usa sempre as RPCs
+  `list_organization_members`, `add_organization_member_by_email`,
+  `update_member_role` e `remove_organization_member` — nunca escreve
+  directamente na tabela — e cada uma valida de novo, no servidor, que o
+  chamador é owner/admin da organização em causa.
+- Adicionar um membro exige que a pessoa **já tenha conta** CobrançaPro
+  (procurada por email); não existe convite por email nesta versão.
+
+---

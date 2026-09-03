@@ -1,7 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
-import { AppShell } from '@/components/layout/AppShell';
-import { ComingSoon } from '@/components/ui/ComingSoon';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { RegisterPage } from '@/features/auth/RegisterPage';
 import { ForgotPasswordPage } from '@/features/auth/ForgotPasswordPage';
@@ -17,16 +15,8 @@ import { SubscriptionsListPage } from '@/features/subscriptions/SubscriptionsLis
 import { PaymentsListPage } from '@/features/payments/PaymentsListPage';
 import { RemindersListPage } from '@/features/reminders/RemindersListPage';
 import { ReportsPage } from '@/features/reports/ReportsPage';
-
-function ProtectedComingSoon({ title }: { title: string }) {
-  return (
-    <ProtectedRoute>
-      <AppShell>
-        <ComingSoon title={title} />
-      </AppShell>
-    </ProtectedRoute>
-  );
-}
+import { SettingsPage } from '@/features/settings/SettingsPage';
+import { BillingPage } from '@/features/billing/BillingPage';
 
 export default function App() {
   return (
@@ -130,8 +120,22 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-      <Route path="/settings" element={<ProtectedComingSoon title="Definições" />} />
-      <Route path="/billing" element={<ProtectedComingSoon title="Plano e facturação" />} />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <SettingsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/billing"
+        element={
+          <ProtectedRoute>
+            <BillingPage />
+          </ProtectedRoute>
+        }
+      />
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

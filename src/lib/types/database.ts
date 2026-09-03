@@ -20,6 +20,8 @@ export type ReminderChannel = 'whatsapp' | 'sms' | 'email' | 'internal';
 export type ReminderStatus = 'scheduled' | 'sent' | 'failed' | 'cancelled';
 export type OrgMemberRole = 'owner' | 'admin' | 'staff';
 export type PlanTier = 'free' | 'basico' | 'profissional' | 'empresa';
+export type SubscriptionStatusTier = 'trialing' | 'active' | 'past_due' | 'cancelled' | 'free';
+export type BillingCycle = 'monthly' | 'yearly';
 
 export interface Profile {
   id: string;
@@ -35,9 +37,83 @@ export interface Organization {
   name: string;
   business_type: string | null;
   currency: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
   plan: PlanTier;
+  subscription_status: SubscriptionStatusTier;
+  trial_start: string | null;
+  trial_end: string | null;
+  billing_period: BillingCycle;
+  started_at: string | null;
+  expires_at: string | null;
+  cancelled_at: string | null;
+  provider: string | null;
+  external_reference: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface PlanLimits {
+  max_clients: number | null;
+  max_services: number | null;
+  max_members: number | null;
+  max_invoices_per_month: number | null;
+  recurring_enabled: boolean;
+  reports_enabled: boolean;
+  advanced_features: boolean;
+}
+
+export interface PlanUsage {
+  clients_count: number;
+  services_count: number;
+  members_count: number;
+  invoices_this_month: number;
+}
+
+export interface PlanStatus {
+  plan: PlanTier;
+  effective_plan: PlanTier;
+  subscription_status: SubscriptionStatusTier;
+  billing_period: BillingCycle;
+  trial_start: string | null;
+  trial_end: string | null;
+  trial_days_remaining: number;
+  is_trial_active: boolean;
+  is_trial_expired: boolean;
+  started_at: string | null;
+  expires_at: string | null;
+  cancelled_at: string | null;
+  provider: string | null;
+  external_reference: string | null;
+  limits: PlanLimits;
+  usage: PlanUsage;
+}
+
+export type PurchaseIntentStatus = 'pending' | 'confirmed' | 'rejected';
+
+export interface PurchaseIntent {
+  id: string;
+  organization_id: string;
+  requested_plan: PlanTier;
+  billing_period: BillingCycle;
+  provider: string | null;
+  external_reference: string | null;
+  note: string | null;
+  status: PurchaseIntentStatus;
+  requested_by: string;
+  created_at: string;
+  confirmed_at: string | null;
+}
+
+export interface OrganizationMemberWithProfile {
+  member_id: string;
+  user_id: string;
+  role: OrgMemberRole;
+  full_name: string | null;
+  email: string | null;
+  is_you: boolean;
+  created_at: string;
 }
 
 export interface OrganizationMember {

@@ -9,6 +9,7 @@ import {
   Bell,
   BarChart3,
   Settings,
+  CreditCard,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -28,5 +29,6 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/payments', label: 'Pagamentos', icon: Wallet, desktopOnly: true },
   { to: '/reminders', label: 'Lembretes', icon: Bell, desktopOnly: true },
   { to: '/reports', label: 'Relatórios', icon: BarChart3 },
+  { to: '/billing', label: 'Plano', icon: CreditCard, desktopOnly: true },
   { to: '/settings', label: 'Definições', icon: Settings, desktopOnly: true },
 ];

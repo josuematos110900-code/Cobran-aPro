@@ -1,17 +1,27 @@
 import { useEffect, useState } from 'react';
-import { Wallet, Clock, AlertTriangle, Users, Bell } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Wallet, Clock, AlertTriangle, Users, Bell, Repeat, TrendingUp } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { Card } from '@/components/ui/Card';
 import { ErrorMessage } from '@/components/ui/ErrorMessage';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchReminderTotals, type ReminderTotals } from '@/features/reminders/api';
+import { fetchPaymentTotals, type PaymentTotals } from '@/features/payments/api';
+import { fetchPlanStatus } from '@/features/billing/api';
+import type { PlanStatus } from '@/lib/types/database';
+import { fetchOnboardingProgress, fetchRecentOverdueInvoices, type OnboardingProgress, type RecentOverdueInvoice } from './api';
+import { TrialBanner } from './TrialBanner';
+import { QuickActions } from './QuickActions';
+import { OnboardingChecklist } from './OnboardingChecklist';
 
 interface DashboardTotals {
   total_received: number;
   total_pending: number;
   total_overdue: number;
   active_clients: number;
+  invoices_this_month: number;
+  active_subscriptions: number;
 }
 
 function formatCurrency(value: number, currency: string) {
@@ -26,10 +36,18 @@ function formatCurrency(value: number, currency: string) {
   }
 }
 
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString('pt-AO', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
 export function DashboardPage() {
   const { organization } = useAuth();
   const [totals, setTotals] = useState<DashboardTotals | null>(null);
   const [reminderTotals, setReminderTotals] = useState<ReminderTotals | null>(null);
+  const [paymentTotals, setPaymentTotals] = useState<PaymentTotals | null>(null);
+  const [planStatus, setPlanStatus] = useState<PlanStatus | null>(null);
+  const [progress, setProgress] = useState<OnboardingProgress | null>(null);
+  const [overdue, setOverdue] = useState<RecentOverdueInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,13 +75,28 @@ export function DashboardPage() {
             total_pending: 0,
             total_overdue: 0,
             active_clients: 0,
+            invoices_this_month: 0,
+            active_subscriptions: 0,
           }
         );
       }
 
-      const { totals: fetchedReminderTotals } = await fetchReminderTotals(organization!.id);
-      if (isMounted) setReminderTotals(fetchedReminderTotals);
+      const [{ totals: fetchedReminderTotals }, { totals: fetchedPaymentTotals }, { status: fetchedPlanStatus }, fetchedProgress, { invoices: fetchedOverdue }] =
+        await Promise.all([
+          fetchReminderTotals(organization!.id),
+          fetchPaymentTotals(organization!.id),
+          fetchPlanStatus(organization!.id),
+          fetchOnboardingProgress(organization!.id),
+          fetchRecentOverdueInvoices(organization!.id),
+        ]);
 
+      if (!isMounted) return;
+
+      setReminderTotals(fetchedReminderTotals);
+      setPaymentTotals(fetchedPaymentTotals);
+      setPlanStatus(fetchedPlanStatus);
+      setProgress(fetchedProgress);
+      setOverdue(fetchedOverdue);
       setLoading(false);
     }
 
@@ -88,6 +121,12 @@ export function DashboardPage() {
             <ErrorMessage message={error} />
           </div>
         )}
+
+        {planStatus && <TrialBanner status={planStatus} />}
+
+        <QuickActions />
+
+        {progress && <OnboardingChecklist progress={progress} />}
 
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <SummaryCard
@@ -116,35 +155,66 @@ export function DashboardPage() {
           />
         </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <SummaryCard
-            icon={Bell}
-            label="Lembretes enviados"
-            value={loading ? null : String(reminderTotals?.total_sent ?? 0)}
+            icon={TrendingUp}
+            label="Recebido este mês"
+            value={loading ? null : formatCurrency(paymentTotals?.total_this_month ?? 0, currency)}
+            accent="text-emerald-600 dark:text-emerald-400"
+          />
+          <SummaryCard
+            icon={Wallet}
+            label="Cobranças este mês"
+            value={loading ? null : String(totals?.invoices_this_month ?? 0)}
             accent="text-brand-600 dark:text-brand-400"
           />
           <SummaryCard
-            icon={Bell}
-            label="Lembretes hoje"
-            value={loading ? null : String(reminderTotals?.sent_today ?? 0)}
-            accent="text-amber-600 dark:text-amber-400"
+            icon={Repeat}
+            label="Recorrências activas"
+            value={loading ? null : String(totals?.active_subscriptions ?? 0)}
+            accent="text-brand-600 dark:text-brand-400"
           />
           <SummaryCard
             icon={Bell}
             label="Lembretes este mês"
             value={loading ? null : String(reminderTotals?.sent_this_month ?? 0)}
-            accent="text-emerald-600 dark:text-emerald-400"
+            accent="text-amber-600 dark:text-amber-400"
           />
         </div>
 
         <Card className="mt-6">
-          <h2 className="text-base font-semibold text-slate-900 dark:text-white">
-            Cobranças de hoje
-          </h2>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            A lista de cobranças a vencer hoje aparecerá aqui assim que a
-            secção de Cobranças estiver ligada aos dados reais.
-          </p>
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-semibold text-slate-900 dark:text-white">
+              Vencidas recentemente
+            </h2>
+            <Link to="/invoices" className="text-xs font-medium text-brand-600 hover:underline dark:text-brand-400">
+              Ver todas
+            </Link>
+          </div>
+
+          {!loading && overdue.length === 0 && (
+            <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
+              Sem cobranças atrasadas no momento — bom trabalho!
+            </p>
+          )}
+
+          {overdue.length > 0 && (
+            <ul className="mt-3 divide-y divide-slate-100 dark:divide-slate-800">
+              {overdue.map((invoice) => (
+                <li key={invoice.id} className="flex items-center justify-between gap-2 py-2 text-sm">
+                  <div>
+                    <p className="font-medium text-slate-900 dark:text-white">{invoice.client_name}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {invoice.invoice_number} · venceu em {formatDate(invoice.due_date)}
+                    </p>
+                  </div>
+                  <span className="font-semibold text-red-600 dark:text-red-400">
+                    {formatCurrency(invoice.amount, invoice.currency)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
       </div>
     </AppShell>
