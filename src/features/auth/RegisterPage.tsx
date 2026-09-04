@@ -5,6 +5,7 @@ import { translateAuthError } from '@/lib/authErrors';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { ErrorMessage } from '@/components/ui/ErrorMessage';
+import { AuthLayout } from '@/components/layout/AuthLayout';
 
 export function RegisterPage() {
   const navigate = useNavigate();
@@ -55,72 +56,63 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 dark:bg-surface-dark">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">CobrançaPro</h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Crie a sua conta gratuita.
+    <AuthLayout subtitle="Crie a sua conta gratuita.">
+      <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Criar conta</h2>
+
+        {error && <ErrorMessage message={error} />}
+        {infoMessage && (
+          <p className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-300">
+            {infoMessage}
           </p>
-        </div>
+        )}
 
-        <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Criar conta</h2>
+        <Input
+          label="Nome completo"
+          type="text"
+          autoComplete="name"
+          required
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
+        />
+        <Input
+          label="Email"
+          type="email"
+          autoComplete="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <Input
+          label="Palavra-passe"
+          type="password"
+          autoComplete="new-password"
+          required
+          minLength={6}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <Input
+          label="Confirmar palavra-passe"
+          type="password"
+          autoComplete="new-password"
+          required
+          minLength={6}
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+        />
 
-          {error && <ErrorMessage message={error} />}
-          {infoMessage && (
-            <p className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-300">
-              {infoMessage}
-            </p>
-          )}
+        <Button type="submit" className="w-full" loading={loading}>
+          Criar conta
+        </Button>
 
-          <Input
-            label="Nome completo"
-            type="text"
-            autoComplete="name"
-            required
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-          />
-          <Input
-            label="Email"
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <Input
-            label="Palavra-passe"
-            type="password"
-            autoComplete="new-password"
-            required
-            minLength={6}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <Input
-            label="Confirmar palavra-passe"
-            type="password"
-            autoComplete="new-password"
-            required
-            minLength={6}
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-          />
-
-          <Button type="submit" className="w-full" loading={loading}>
-            Criar conta
-          </Button>
-
-          <p className="text-center text-sm text-slate-500 dark:text-slate-400">
-            Já tem conta?{' '}
-            <Link to="/login" className="font-medium text-brand-600 hover:underline">
-              Iniciar sessão
-            </Link>
-          </p>
-        </form>
-      </div>
-    </div>
+        <p className="text-center text-sm text-slate-500 dark:text-slate-400">
+          Já tem conta?{' '}
+          <Link to="/login" className="font-medium text-brand-600 hover:underline">
+            Iniciar sessão
+          </Link>
+        </p>
+      </form>
+    </AuthLayout>
   );
 }

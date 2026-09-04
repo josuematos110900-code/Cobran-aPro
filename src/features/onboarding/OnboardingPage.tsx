@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { ErrorMessage } from '@/components/ui/ErrorMessage';
+import { AuthLayout } from '@/components/layout/AuthLayout';
 
 const BUSINESS_TYPES = [
   'Escola / Explicador',
@@ -70,68 +71,61 @@ export function OnboardingPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 dark:bg-surface-dark">
-      <div className="w-full max-w-md">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-            Vamos configurar a sua empresa
-          </h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Só demora um minuto.
-          </p>
+    <AuthLayout
+      title="Vamos configurar a sua empresa"
+      subtitle="Só demora um minuto."
+      maxWidthClassName="max-w-md"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        {error && <ErrorMessage message={error} />}
+
+        <Input
+          label="Nome da empresa"
+          type="text"
+          required
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Ex: Academia Vida Fit"
+        />
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Tipo de negócio
+          </label>
+          <select
+            value={businessType}
+            onChange={(e) => setBusinessType(e.target.value)}
+            className="rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          >
+            {BUSINESS_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          {error && <ErrorMessage message={error} />}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Moeda principal
+          </label>
+          <select
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value)}
+            className="rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          >
+            {CURRENCIES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
-          <Input
-            label="Nome da empresa"
-            type="text"
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Ex: Academia Vida Fit"
-          />
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              Tipo de negócio
-            </label>
-            <select
-              value={businessType}
-              onChange={(e) => setBusinessType(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-            >
-              {BUSINESS_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              Moeda principal
-            </label>
-            <select
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-            >
-              {CURRENCIES.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <Button type="submit" className="w-full" loading={loading}>
-            Continuar
-          </Button>
-        </form>
-      </div>
-    </div>
+        <Button type="submit" className="w-full" loading={loading}>
+          Continuar
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }
