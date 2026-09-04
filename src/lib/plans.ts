@@ -44,7 +44,7 @@ export const PLANS: PlanDefinition[] = [
   {
     id: 'basico',
     name: 'Básico',
-    priceMonthlyAoa: 9900,
+    priceMonthlyAoa: 5000,
     tagline: 'Para pequenos negócios com uma carteira de clientes fixa.',
     highlights: [
       'Até 30 clientes',
@@ -66,7 +66,7 @@ export const PLANS: PlanDefinition[] = [
   {
     id: 'profissional',
     name: 'Profissional',
-    priceMonthlyAoa: 24900,
+    priceMonthlyAoa: 10000,
     tagline: 'Para negócios em crescimento com equipa e recorrências.',
     highlights: [
       'Até 150 clientes',
@@ -88,8 +88,8 @@ export const PLANS: PlanDefinition[] = [
   {
     id: 'empresa',
     name: 'Empresa',
-    priceMonthlyAoa: null,
-    tagline: 'Para operações de maior volume — fale connosco.',
+    priceMonthlyAoa: 25000,
+    tagline: 'Para operações de maior volume, com suporte prioritário.',
     highlights: [
       'Clientes ilimitados',
       'Cobranças ilimitadas',
