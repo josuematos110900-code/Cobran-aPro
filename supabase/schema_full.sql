@@ -1,5 +1,5 @@
 -- schema_full.sql — gerado automaticamente por concatenação de
--- 001_extensions_and_helpers.sql até 029_create_organization_with_owner.sql,
+-- 001_extensions_and_helpers.sql até 032_service_role_bypass_plan_checks.sql,
 -- pela ordem numérica. NÃO editar directamente — para alterar o
 -- schema, edite a migration individual correspondente em
 -- supabase/migrations/ e regenere este ficheiro.
@@ -30,6 +30,7 @@ begin
   return new;
 end;
 $$;
+
 
 -- =======================================================================
 -- 002_profiles.sql
@@ -82,6 +83,7 @@ $$;
 create trigger trg_on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
 
 -- =======================================================================
 -- 003_organizations.sql
@@ -212,6 +214,7 @@ create policy "org_members_delete_by_admin"
   on public.organization_members for delete
   using (organization_id in (select public.user_admin_organization_ids()));
 
+
 -- =======================================================================
 -- 004_clients.sql
 -- =======================================================================
@@ -257,6 +260,7 @@ create policy "clients_delete_member"
   on public.clients for delete
   using (organization_id in (select public.user_organization_ids()));
 
+
 -- =======================================================================
 -- 005_services.sql
 -- =======================================================================
@@ -300,6 +304,7 @@ create policy "services_update_member"
 create policy "services_delete_member"
   on public.services for delete
   using (organization_id in (select public.user_organization_ids()));
+
 
 -- =======================================================================
 -- 006_subscriptions.sql
@@ -353,6 +358,7 @@ create policy "subscriptions_update_member"
 create policy "subscriptions_delete_member"
   on public.subscriptions for delete
   using (organization_id in (select public.user_organization_ids()));
+
 
 -- =======================================================================
 -- 007_invoices.sql
@@ -423,6 +429,7 @@ begin
   return 'FAT-' || lpad((v_count + 1)::text, 6, '0');
 end;
 $$;
+
 
 -- =======================================================================
 -- 008_payments.sql
@@ -500,6 +507,7 @@ create trigger trg_payments_mark_invoice_paid
   after insert on public.payments
   for each row execute function public.handle_payment_marks_invoice_paid();
 
+
 -- =======================================================================
 -- 009_reminders.sql
 -- =======================================================================
@@ -541,6 +549,7 @@ create policy "reminders_delete_member"
   on public.reminders for delete
   using (organization_id in (select public.user_organization_ids()));
 
+
 -- =======================================================================
 -- 010_notifications.sql
 -- =======================================================================
@@ -578,6 +587,7 @@ create policy "notifications_update_member"
 create policy "notifications_delete_member"
   on public.notifications for delete
   using (organization_id in (select public.user_organization_ids()));
+
 
 -- =======================================================================
 -- 011_settings.sql
@@ -631,6 +641,7 @@ create trigger trg_on_organization_created_settings
   after insert on public.organizations
   for each row execute function public.handle_new_organization_settings();
 
+
 -- =======================================================================
 -- 012_dashboard_helpers.sql
 -- =======================================================================
@@ -672,6 +683,7 @@ left join public.invoices i on i.organization_id = o.id
 left join public.clients c on c.organization_id = o.id
 group by o.id;
 
+
 -- =======================================================================
 -- 013_client_balances.sql
 -- =======================================================================
@@ -695,6 +707,7 @@ select
 from public.clients c
 left join public.invoices i on i.client_id = c.id
 group by c.id, c.organization_id;
+
 
 -- =======================================================================
 -- 014_invoice_number_counters.sql
@@ -751,6 +764,7 @@ $$;
 -- dentro da própria função de negócio que a chama) podem invocar isto.
 revoke execute on function public.next_invoice_number(uuid) from public;
 grant execute on function public.next_invoice_number(uuid) to authenticated;
+
 
 -- =======================================================================
 -- 015_mark_invoice_paid.sql
@@ -827,6 +841,7 @@ $$;
 revoke execute on function public.mark_invoice_paid(uuid, text, text) from public;
 grant execute on function public.mark_invoice_paid(uuid, text, text) to authenticated;
 
+
 -- =======================================================================
 -- 016_invoices_guards.sql
 -- =======================================================================
@@ -868,6 +883,7 @@ create trigger trg_invoices_status_guard
 --    "authenticated" por definição.
 revoke execute on function public.mark_overdue_invoices() from public, authenticated, anon;
 grant execute on function public.mark_overdue_invoices() to service_role;
+
 
 -- =======================================================================
 -- 017_recurring_billing.sql
@@ -1169,6 +1185,7 @@ $$;
 revoke execute on function public.generate_recurring_invoices() from public, authenticated, anon;
 grant execute on function public.generate_recurring_invoices() to service_role;
 
+
 -- =======================================================================
 -- 018_payments_hardening.sql
 -- =======================================================================
@@ -1309,6 +1326,7 @@ $$;
 revoke execute on function public.mark_invoice_paid(uuid, text, text, timestamptz, text) from public;
 grant execute on function public.mark_invoice_paid(uuid, text, text, timestamptz, text) to authenticated;
 
+
 -- =======================================================================
 -- 019_reminders_types.sql
 -- =======================================================================
@@ -1353,6 +1371,7 @@ select
   ) as sent_this_month
 from public.reminders r
 group by r.organization_id;
+
 
 -- =======================================================================
 -- 020_reports.sql
@@ -1768,6 +1787,7 @@ begin
   limit p_limit;
 end;
 $$;
+
 
 -- =======================================================================
 -- 021_plans_trial_and_limits.sql
@@ -2228,6 +2248,7 @@ $$;
 revoke execute on function public.request_plan_upgrade(uuid, text, text, text) from public;
 grant execute on function public.request_plan_upgrade(uuid, text, text, text) to authenticated;
 
+
 -- =======================================================================
 -- 022_member_management_and_settings.sql
 -- =======================================================================
@@ -2470,6 +2491,7 @@ $$;
 revoke execute on function public.remove_organization_member(uuid) from public;
 grant execute on function public.remove_organization_member(uuid) to authenticated;
 
+
 -- =======================================================================
 -- 023_organization_contact_info.sql
 -- =======================================================================
@@ -2481,6 +2503,7 @@ alter table public.organizations
   add column if not exists phone text,
   add column if not exists email text,
   add column if not exists address text;
+
 
 -- =======================================================================
 -- 024_dashboard_extra_stats.sql
@@ -2529,6 +2552,7 @@ as $$
   limit greatest(1, least(p_limit, 50));
 $$;
 
+
 -- =======================================================================
 -- 025_fix_security_definer_views.sql
 -- =======================================================================
@@ -2547,6 +2571,7 @@ alter view public.dashboard_totals set (security_invoker = true);
 alter view public.client_balances set (security_invoker = true);
 alter view public.payment_totals set (security_invoker = true);
 alter view public.reminder_totals set (security_invoker = true);
+
 
 -- =======================================================================
 -- 026_revoke_anon_and_harden_plan_functions.sql
@@ -2682,6 +2707,7 @@ $$;
 revoke execute on function public.next_invoice_number(uuid) from public, anon;
 grant execute on function public.next_invoice_number(uuid) to authenticated, service_role;
 
+
 -- =======================================================================
 -- 027_search_path_and_anon_revoke.sql
 -- =======================================================================
@@ -2750,6 +2776,7 @@ revoke execute on function public.update_member_role(uuid, text) from anon;
 revoke execute on function public.user_admin_organization_ids() from anon;
 revoke execute on function public.user_organization_ids() from anon;
 
+
 -- =======================================================================
 -- 028_revoke_public_grant_authenticated.sql
 -- =======================================================================
@@ -2815,6 +2842,7 @@ grant execute on function public.trial_duration_days() to authenticated;
 grant execute on function public.user_admin_organization_ids() to authenticated;
 grant execute on function public.user_organization_ids() to authenticated;
 
+
 -- =======================================================================
 -- 029_create_organization_with_owner.sql
 -- =======================================================================
@@ -2867,3 +2895,204 @@ $$;
 
 revoke execute on function public.create_organization_with_owner(text, text, text) from public, anon;
 grant execute on function public.create_organization_with_owner(text, text, text) to authenticated;
+
+
+-- =======================================================================
+-- 030_performance_tuning.sql
+-- =======================================================================
+-- 030_performance_tuning.sql
+--
+-- Afinações de performance identificadas pelo advisor do Supabase depois
+-- da migration 029 (já aplicadas directamente no projecto real via MCP;
+-- este ficheiro só documenta/reproduz essas alterações no histórico de
+-- migrations do repositório para manter o schema_full.sql e uma instalação
+-- nova a partir de zero sincronizados com o que está em produção):
+--
+--   1. Índices em falta nas foreign keys mais consultadas (evita "seq scan"
+--      em tabelas que crescem com o uso: pedidos de upgrade, lembretes,
+--      histórico de facturação recorrente e subscrições).
+--   2. Reescreve 5 políticas RLS que chamavam auth.uid() directamente em
+--      cada linha avaliada, para usarem "(select auth.uid())" — o Postgres
+--      cacheia o resultado do sub-select uma vez por query em vez de o
+--      reavaliar por linha, o que importa em tabelas grandes.
+
+-- 1. Índices em falta nas foreign keys.
+create index if not exists idx_purchase_intents_requested_by on public.purchase_intents (requested_by);
+create index if not exists idx_reminders_invoice_id on public.reminders (invoice_id);
+create index if not exists idx_billing_log_invoice_id on public.subscription_billing_log (invoice_id);
+create index if not exists idx_subscriptions_service_id on public.subscriptions (service_id);
+
+-- 2. Políticas RLS reescritas para "(select auth.uid())".
+drop policy if exists profiles_select_own on public.profiles;
+create policy profiles_select_own on public.profiles
+  for select
+  using (id = (select auth.uid()));
+
+drop policy if exists profiles_insert_own on public.profiles;
+create policy profiles_insert_own on public.profiles
+  for insert
+  with check (id = (select auth.uid()));
+
+drop policy if exists profiles_update_own on public.profiles;
+create policy profiles_update_own on public.profiles
+  for update
+  using (id = (select auth.uid()))
+  with check (id = (select auth.uid()));
+
+drop policy if exists organizations_insert_authenticated on public.organizations;
+create policy organizations_insert_authenticated on public.organizations
+  for insert
+  with check ((select auth.uid()) is not null);
+
+drop policy if exists org_members_insert_first_owner on public.organization_members;
+create policy org_members_insert_first_owner on public.organization_members
+  for insert
+  with check (
+    user_id = (select auth.uid())
+    and role = 'owner'
+    and not exists (
+      select 1 from public.organization_members existing
+      where existing.organization_id = organization_members.organization_id
+    )
+  );
+
+
+-- =======================================================================
+-- 031_cron_secret_in_db.sql
+-- =======================================================================
+-- 031_cron_secret_in_db.sql
+--
+-- Corrige a autenticação do cron diário que chama a Edge Function
+-- "generate-invoices" (facturação recorrente, cobranças em atraso e fim
+-- de subscrições expiradas).
+--
+-- Problema encontrado em produção: a função lia o segredo esperado de
+-- Deno.env.get('CRON_SECRET'), configurado manualmente no Supabase
+-- Dashboard (Project Settings > Edge Functions > Secrets). Apesar de
+-- configurado, a função reportava sempre CRON_SECRET vazio
+-- (cron_secret_is_set: false) — a execução diária às 03:00 falhava
+-- sempre com 401 e nenhuma cobrança recorrente era gerada
+-- automaticamente. Não existe forma de diagnosticar/corrigir a
+-- propagação desse secret específico apenas com acesso à base de dados.
+--
+-- Solução: deixar de depender de um secret configurado manualmente no
+-- Dashboard. O segredo passa a viver numa tabela normal do Postgres,
+-- só acessível a service_role — tanto o job do pg_cron (que corre com
+-- privilégios de superutilizador e ignora RLS) como a própria Edge
+-- Function (que já usa SUPABASE_SERVICE_ROLE_KEY, esse sim sempre
+-- injectado automaticamente pela plataforma, sem configuração manual)
+-- o conseguem ler. Isto elimina o único ponto de falha que dependia de
+-- uma configuração externa ao código/migrations.
+
+create table if not exists public.app_secrets (
+  key text primary key,
+  value text not null,
+  updated_at timestamptz not null default now()
+);
+
+comment on table public.app_secrets is
+  'Segredos internos da aplicação (ex: cron_secret). Nunca exposto via API — sem policies de RLS e sem grants a anon/authenticated, só acessível por service_role ou pelo role que corre as migrations.';
+
+alter table public.app_secrets enable row level security;
+-- Sem policies: por omissão, ninguém (anon/authenticated) consegue
+-- ler ou escrever. service_role ignora RLS, como sempre no Supabase.
+
+revoke all on public.app_secrets from public, anon, authenticated;
+
+-- Gera um novo segredo aleatório de 32 bytes (64 caracteres hex) e
+-- substitui o anterior, que nunca chegou a funcionar.
+insert into public.app_secrets (key, value, updated_at)
+values ('cron_secret', encode(gen_random_bytes(32), 'hex'), now())
+on conflict (key) do update set value = excluded.value, updated_at = now();
+
+-- Reagenda o job diário para ler o segredo directamente da tabela em
+-- cada execução, em vez de o ter gravado como literal fixo no comando
+-- (o que tornava fácil ficar dessincronizado do lado da função).
+select cron.unschedule(jobid) from cron.job where jobname = 'generate-invoices-daily';
+
+select cron.schedule(
+  'generate-invoices-daily',
+  '0 3 * * *',
+  $$
+  select net.http_post(
+    url := 'https://woucfdhotryzfyvzmzdd.supabase.co/functions/v1/generate-invoices',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'x-cron-secret', (select value from public.app_secrets where key = 'cron_secret')
+    ),
+    body := '{}'::jsonb
+  );
+  $$
+);
+
+
+-- =======================================================================
+-- 032_service_role_bypass_plan_checks.sql
+-- =======================================================================
+-- 032_service_role_bypass_plan_checks.sql
+--
+-- Segundo bug encontrado ao testar a correcção do cron (migration 031):
+-- depois de resolver a autenticação, a chamada a generate_recurring_invoices()
+-- continuava a falhar, agora com "Não tem permissão para consultar esta
+-- organização." — vindo de get_effective_plan() e get_organization_usage(),
+-- chamadas por enforce_plan_limit() sempre que uma invoice é inserida.
+--
+-- Estas duas funções verificam sempre
+-- "p_organization_id not in (select user_organization_ids())", que depende
+-- de auth.uid() — no contexto do cron (chamado pela Edge Function com a
+-- service_role key, sem utilizador autenticado) isto é sempre null, logo
+-- user_organization_ids() devolve vazio e a verificação falha sempre.
+--
+-- next_invoice_number() já tinha sido corrigida com uma excepção para
+-- auth.role() = 'service_role' (migration 026). Aplica-se aqui o mesmo
+-- padrão às outras duas funções que faltavam.
+
+create or replace function public.get_effective_plan(p_organization_id uuid)
+returns text
+language plpgsql
+stable security definer
+set search_path to 'public'
+as $function$
+declare
+  v_org public.organizations%rowtype;
+begin
+  if auth.role() <> 'service_role' and p_organization_id not in (select public.user_organization_ids()) then
+    raise exception 'Não tem permissão para consultar esta organização.' using errcode = '42501';
+  end if;
+
+  select * into v_org from public.organizations where id = p_organization_id;
+  if not found then
+    raise exception 'Organização não encontrada.' using errcode = 'P0002';
+  end if;
+
+  if v_org.subscription_status = 'trialing' and v_org.trial_end is not null and v_org.trial_end > now() then
+    return 'profissional';
+  end if;
+
+  return v_org.plan;
+end;
+$function$;
+
+create or replace function public.get_organization_usage(p_organization_id uuid)
+returns table(clients_count integer, services_count integer, members_count integer, invoices_this_month integer)
+language plpgsql
+stable security definer
+set search_path to 'public'
+as $function$
+begin
+  if auth.role() <> 'service_role' and p_organization_id not in (select public.user_organization_ids()) then
+    raise exception 'Não tem permissão para consultar esta organização.' using errcode = '42501';
+  end if;
+
+  return query
+  select
+    (select count(*)::integer from public.clients where organization_id = p_organization_id and status <> 'archived'),
+    (select count(*)::integer from public.services where organization_id = p_organization_id),
+    (select count(*)::integer from public.organization_members where organization_id = p_organization_id),
+    (select count(*)::integer from public.invoices
+       where organization_id = p_organization_id
+         and date_trunc('month', created_at) = date_trunc('month', now()));
+end;
+$function$;
+
+

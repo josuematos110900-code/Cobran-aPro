@@ -358,16 +358,41 @@ Isto publica o código tal como está em
 `supabase/functions/generate-invoices/index.ts` — não precisa de
 alterar nada antes de publicar.
 
-### 11.3. Configurar o `CRON_SECRET`
+### 11.3. Segredo do cron (`app_secrets`)
 
 A função só aceita pedidos que incluam o cabeçalho `x-cron-secret` com
-um valor exacto que só você conhece. Isto existe para que ninguém que
-descubra o URL da função a consiga invocar e disparar geração de
-facturas à vontade.
+um valor exacto. Isto existe para que ninguém que descubra o URL da
+função a consiga invocar e disparar geração de facturas à vontade.
 
-```bash
-supabase secrets set CRON_SECRET=escolha-um-valor-longo-e-aleatorio-aqui
+Numa versão anterior este valor era lido de `Deno.env.get('CRON_SECRET')`,
+configurado manualmente no Dashboard (Project Settings > Edge Functions
+> Secrets). **Na prática esse secret nunca chegava ao ambiente de
+execução da função** (o Dashboard reportava-o como definido, mas a
+função via-o sempre vazio), pelo que a execução diária falhava sempre
+com `401` e nenhuma factura recorrente era gerada automaticamente.
+
+A correcção (migration `031_cron_secret_in_db.sql`) deixa de depender de
+qualquer configuração manual fora do código: o segredo passou a viver
+numa tabela normal do Postgres, `public.app_secrets` (chave
+`cron_secret`), sem RLS nem grants a `anon`/`authenticated` — só
+`service_role` (e o `postgres` que corre o `pg_cron`) lhe consegue
+aceder. A própria migration já gera um valor aleatório de 64 caracteres
+e reagenda o job do `pg_cron` para o ler directamente da tabela em cada
+execução — não há nada a configurar manualmente no Dashboard.
+
+Para gerar um novo segredo (ex: se suspeitar que foi exposto), corra no
+SQL Editor do seu projecto:
+
+```sql
+update public.app_secrets
+set value = encode(gen_random_bytes(32), 'hex'), updated_at = now()
+where key = 'cron_secret';
 ```
+
+O `cron.schedule` já lê o valor da tabela em cada execução
+(`(select value from public.app_secrets where key = 'cron_secret')`),
+por isso um novo valor entra em vigor na execução seguinte, sem
+precisar de reagendar o job nem de reimplantar a função.
 
 **Não precisa de configurar `SUPABASE_URL` nem
 `SUPABASE_SERVICE_ROLE_KEY`** — a plataforma Supabase injecta estas
@@ -375,64 +400,30 @@ automaticamente em todas as Edge Functions, tanto em produção como em
 `supabase functions serve` local. Nunca as defina manualmente nem as
 exponha no frontend.
 
-Para confirmar que o secret ficou guardado:
-
-```bash
-supabase secrets list
-```
-
 ### 11.4. Configurar o Cron
 
-O mecanismo actual e recomendado é o **Supabase Cron**, que usa
-internamente as extensões `pg_cron` + `pg_net` mas expõe uma interface
-simples:
+O agendamento usa `pg_cron` + `pg_net` directamente (migration
+`031_cron_secret_in_db.sql`), já aplicado no projecto de produção — o
+job `generate-invoices-daily` corre todos os dias às `03:00 UTC`
+(`0 3 * * *`), cedo o suficiente para que as facturas do dia já estejam
+geradas quando os utilizadores abrirem o dashboard de manhã. A função é
+idempotente, pelo que correr com mais frequência nunca duplica facturas
+(ver 11.5).
 
-1. No painel do projecto, vá a **Integrations → Cron** (ou **Database →
-   Cron**, dependendo da versão do dashboard).
-2. Crie um novo Job do tipo **Edge Function**.
-3. Seleccione `generate-invoices`.
-4. Defina a frequência recomendada: **diariamente**, por exemplo às
-   `03:00 UTC` (`0 3 * * *`) — cedo o suficiente para que as facturas do
-   dia já estejam geradas quando os utilizadores abrirem o dashboard de
-   manhã. Para negócios com subscrições semanais é seguro correr mais
-   vezes por dia; a função é idempotente, pelo que correr com mais
-   frequência nunca duplica facturas (ver 11.5).
-5. Adicione o cabeçalho HTTP `x-cron-secret` com o mesmo valor definido
-   em `CRON_SECRET`.
-6. Grave o Job.
-
-**Alternativa via SQL** (se preferir gerir o agendamento como código, em
-vez da interface do dashboard), a correr uma vez no SQL Editor do seu
-projecto (substitua `SEU_PROJECT_REF` e o valor do secret):
+Para consultar ou alterar o agendamento:
 
 ```sql
-create extension if not exists pg_cron;
-create extension if not exists pg_net;
+select jobid, jobname, schedule, active from cron.job
+where jobname = 'generate-invoices-daily';
 
-select cron.schedule(
-  'generate-invoices-daily',
-  '0 3 * * *',
-  $$
-  select net.http_post(
-    url := 'https://SEU_PROJECT_REF.supabase.co/functions/v1/generate-invoices',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'x-cron-secret', 'o-mesmo-valor-do-CRON_SECRET'
-    ),
-    body := '{}'::jsonb
-  );
-  $$
-);
+-- para alterar a frequência, por exemplo:
+select cron.alter_job(job_id := <jobid>, schedule := '0 */6 * * *');
 ```
 
-Guardar o segredo directamente numa migration SQL versionada não é
-recomendável — prefira criar este `cron.schedule` manualmente no SQL
-Editor do dashboard (não faz parte das migrations deste repositório).
-
-**Limitação a ter em conta:** eu não tenho forma de criar, executar ou
-verificar este Job a partir deste ambiente — a ligação a `pg_cron`,
-`pg_net` e ao URL real da sua função só existe dentro do seu projecto
-Supabase. Os passos acima são exactos, mas têm de ser executados por si.
+Se precisar de recriar o job do zero num projecto novo, a definição
+completa está na migration `031_cron_secret_in_db.sql` deste
+repositório — corre `cron.schedule(...)` lendo o segredo directamente
+de `public.app_secrets`, sem qualquer valor hardcoded.
 
 ### 11.5. Como testar manualmente
 
@@ -443,7 +434,7 @@ testar):
 curl -i -X POST \
   'https://SEU_PROJECT_REF.supabase.co/functions/v1/generate-invoices' \
   -H 'Content-Type: application/json' \
-  -H 'x-cron-secret: o-mesmo-valor-do-CRON_SECRET'
+  -H "x-cron-secret: $(psql "$DATABASE_URL" -tAc "select value from public.app_secrets where key = 'cron_secret'")"
 ```
 
 Resposta esperada (exemplo):
@@ -470,10 +461,10 @@ para garantir que a função não está acessível publicamente.
 supabase functions serve generate-invoices --env-file supabase/functions/.env
 ```
 
-(crie esse `.env` local, fora do controlo de versões, só com
-`CRON_SECRET=...` para os testes locais — em produção o Supabase já
-injecta `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` automaticamente,
-como referido em 11.3).
+(em produção o Supabase já injecta `SUPABASE_URL`/
+`SUPABASE_SERVICE_ROLE_KEY` automaticamente; o segredo do cron é lido
+de `public.app_secrets`, como referido em 11.3, por isso não precisa de
+nenhum `.env` local para o testar).
 
 **Chamar a função Postgres directamente**, sem passar pela Edge Function
 (útil para depurar a lógica de geração em isolado, no SQL Editor —
@@ -569,12 +560,13 @@ having count(*) > 1;
 
 ### 11.9. Segurança desta função — resumo
 
-- Não existem segredos escritos no código: `CRON_SECRET`,
-  `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` são todos lidos de
-  variáveis de ambiente (`Deno.env.get(...)`), nunca hardcoded.
-  `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` são injectadas automaticamente pela
-  plataforma; só o `CRON_SECRET` precisa de ser definido manualmente
-  (secção 11.3).
+- Não existem segredos escritos no código: `SUPABASE_URL` e
+  `SUPABASE_SERVICE_ROLE_KEY` são lidos de variáveis de ambiente
+  (`Deno.env.get(...)`), injectadas automaticamente pela plataforma em
+  todas as Edge Functions, nunca hardcoded. O segredo do cron
+  (`x-cron-secret`) é lido de `public.app_secrets`, uma tabela sem RLS
+  nem grants a `anon`/`authenticated` (secção 11.3) — não depende de
+  nenhuma configuração manual fora do código/migrations.
 - A `SERVICE_ROLE_KEY` existe apenas dentro do ambiente de execução da
   Edge Function (servidor) — nunca é enviada ao browser nem referenciada
   em código do frontend (`src/`).

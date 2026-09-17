@@ -15,11 +15,22 @@
 // Segurança:
 //   - A SUPABASE_SERVICE_ROLE_KEY nunca é exposta ao browser — só existe
 //     aqui, no ambiente de execução da Edge Function, injectada
-//     automaticamente pela plataforma Supabase.
+//     automaticamente pela plataforma Supabase (sem qualquer configuração
+//     manual — ao contrário de secrets custom, que se mostraram não
+//     fiáveis neste projecto, ver abaixo).
 //   - Esta função só aceita pedidos que incluam o cabeçalho
-//     "x-cron-secret" com o valor exacto do secret CRON_SECRET
-//     (configurado manualmente — ver README, secção de Cron). Isto evita
-//     que alguém que descubra o URL da função a consiga invocar.
+//     "x-cron-secret" com o valor exacto guardado em
+//     public.app_secrets (key = 'cron_secret') — ver migration
+//     031_cron_secret_in_db.sql. Isto evita que alguém que descubra o
+//     URL da função a consiga invocar.
+//     NOTA: inicialmente este segredo vinha de Deno.env.get('CRON_SECRET'),
+//     configurado manualmente no Dashboard (Project Settings > Edge
+//     Functions > Secrets). Na prática esse valor nunca chegava ao
+//     ambiente de execução da função (ficava sempre vazio), pelo que a
+//     execução diária falhava sempre com 401. Passou a guardar-se numa
+//     tabela normal do Postgres, lida aqui com o mesmo client de
+//     service_role já usado para tudo o resto — elimina a dependência de
+//     uma configuração externa ao código/migrations.
 //   - As três funções Postgres chamadas aqui têm o respectivo "execute"
 //     revogado de "authenticated"/"anon" nas migrations — só a
 //     service_role as pode invocar, pelo que nenhum utilizador do
@@ -35,15 +46,7 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  const cronSecret = Deno.env.get('CRON_SECRET');
   const providedSecret = req.headers.get('x-cron-secret');
-
-  if (!cronSecret || providedSecret !== cronSecret) {
-    return new Response(JSON.stringify({ error: 'Não autorizado.' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -59,6 +62,36 @@ Deno.serve(async (req: Request) => {
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false },
   });
+
+  if (!providedSecret) {
+    return new Response(JSON.stringify({ error: 'Não autorizado.' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const { data: secretRow, error: secretError } = await supabase
+    .from('app_secrets')
+    .select('value')
+    .eq('key', 'cron_secret')
+    .maybeSingle();
+
+  if (secretError) {
+    console.error('Erro ao ler cron_secret:', secretError.message);
+    return new Response(JSON.stringify({ error: 'Configuração do servidor em falta.' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const expectedSecret = secretRow?.value;
+
+  if (!expectedSecret || providedSecret !== expectedSecret) {
+    return new Response(JSON.stringify({ error: 'Não autorizado.' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 
   const { data: generated, error: generateError } = await supabase.rpc('generate_recurring_invoices');
 
