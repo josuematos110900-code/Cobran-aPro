@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Configuração por omissão do Supabase (pode também ser definida na aplicação,
+      em Definições > Sincronização).
+      supabase_url: https://SEU-PROJECTO.supabase.co
+      supabase_anon_key: chave PÚBLICA "anon" ou "publishable".
+      NUNCA colocar aqui a chave service_role / secret.
+    -->
+    <string name="supabase_url" translatable="false"></string>
+    <string name="supabase_anon_key" translatable="false"></string>
+</resources>

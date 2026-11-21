@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.PastelGest" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/pg_navy</item>
+        <item name="colorOnPrimary">@color/pg_card_solid</item>
+        <item name="colorPrimaryContainer">@color/pg_accent_soft</item>
+        <item name="colorOnPrimaryContainer">@color/pg_navy</item>
+        <item name="colorSecondary">@color/pg_accent</item>
+        <item name="colorOnSecondary">@color/pg_white</item>
+        <item name="colorSecondaryContainer">@color/pg_accent_soft</item>
+        <item name="colorOnSecondaryContainer">@color/pg_navy</item>
+        <item name="colorTertiary">@color/pg_green</item>
+        <item name="colorError">@color/pg_red</item>
+        <item name="colorSurface">@color/pg_card_solid</item>
+        <item name="colorOnSurface">@color/pg_text</item>
+        <item name="colorOnSurfaceVariant">@color/pg_text_secondary</item>
+        <item name="colorOutline">@color/pg_divider</item>
+        <item name="android:colorBackground">@color/pg_bg</item>
+        <item name="android:windowBackground">@color/pg_bg</item>
+        <item name="android:statusBarColor">@color/pg_header_start</item>
+        <item name="android:navigationBarColor">@color/pg_bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="materialCardViewStyle">@style/PG.Card</item>
+        <item name="textInputStyle">@style/Widget.Material3.TextInputLayout.OutlinedBox</item>
+        <item name="android:windowAnimationStyle">@style/PG.WindowAnimation</item>
+    </style>
+
+    <style name="Theme.PastelGest.Splash" parent="Theme.PastelGest">
+        <item name="android:windowBackground">@drawable/bg_splash</item>
+    </style>
+
+    <style name="PG.WindowAnimation" parent="@android:style/Animation.Activity">
+        <item name="android:activityOpenEnterAnimation">@anim/slide_in_right</item>
+        <item name="android:activityOpenExitAnimation">@anim/fade_out</item>
+        <item name="android:activityCloseEnterAnimation">@anim/fade_in</item>
+        <item name="android:activityCloseExitAnimation">@anim/slide_out_right</item>
+    </style>
+
+    <style name="PG.Card" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardBackgroundColor">@color/pg_card</item>
+        <item name="cardCornerRadius">@dimen/pg_radius</item>
+        <item name="cardElevation">@dimen/pg_elevation</item>
+        <item name="strokeColor">@color/pg_card_stroke</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+
+    <style name="PG.Toolbar" parent="Widget.Material3.Toolbar">
+        <item name="android:background">@drawable/bg_header</item>
+        <item name="titleTextColor">@color/pg_on_header</item>
+        <item name="subtitleTextColor">@color/pg_on_header</item>
+        <item name="navigationIconTint">@color/pg_on_header</item>
+    </style>
+
+    <style name="PG.Text.Title" parent="">
+        <item name="android:textSize">20sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/pg_text</item>
+    </style>
+
+    <style name="PG.Text.Section" parent="">
+        <item name="android:textSize">13sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.06</item>
+        <item name="android:textColor">@color/pg_text_secondary</item>
+    </style>
+
+    <style name="PG.Text.Body" parent="">
+        <item name="android:textSize">15sp</item>
+        <item name="android:textColor">@color/pg_text</item>
+    </style>
+
+    <style name="PG.Text.Caption" parent="">
+        <item name="android:textSize">12sp</item>
+        <item name="android:textColor">@color/pg_text_secondary</item>
+    </style>
+
+    <style name="PG.Text.Kpi" parent="">
+        <item name="android:textSize">19sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/pg_text</item>
+    </style>
+
+    <style name="PG.Button" parent="Widget.Material3.Button">
+        <item name="android:minHeight">52dp</item>
+        <item name="cornerRadius">14dp</item>
+        <item name="backgroundTint">@color/pg_navy</item>
+        <item name="android:textColor">@color/pg_card_solid</item>
+    </style>
+
+    <style name="PG.Button.Outlined" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:minHeight">48dp</item>
+        <item name="cornerRadius">14dp</item>
+    </style>
+
+    <style name="PG.Input" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+        <item name="boxCornerRadiusTopStart">12dp</item>
+        <item name="boxCornerRadiusTopEnd">12dp</item>
+        <item name="boxCornerRadiusBottomStart">12dp</item>
+        <item name="boxCornerRadiusBottomEnd">12dp</item>
+        <item name="android:layout_marginBottom">10dp</item>
+    </style>
+
+    <style name="PG.Input.Dropdown" parent="Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+        <item name="boxCornerRadiusTopStart">12dp</item>
+        <item name="boxCornerRadiusTopEnd">12dp</item>
+        <item name="boxCornerRadiusBottomStart">12dp</item>
+        <item name="boxCornerRadiusBottomEnd">12dp</item>
+        <item name="android:layout_marginBottom">10dp</item>
+    </style>
+
+    <style name="PG.NavIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <item name="android:color">@color/pg_accent_soft</item>
+    </style>
+
+    <style name="PG.Toggle" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:textColor">@color/pg_on_header</item>
+        <item name="strokeColor">#4DFFFFFF</item>
+        <item name="backgroundTint">@color/toggle_bg</item>
+        <item name="android:minHeight">40dp</item>
+    </style>
+
+    <style name="PG.Quick" parent="Widget.Material3.Button.TonalButton">
+        <item name="android:layout_margin">4dp</item>
+        <item name="android:minHeight">52dp</item>
+        <item name="cornerRadius">16dp</item>
+        <item name="backgroundTint">@color/pg_card_solid</item>
+        <item name="android:textColor">@color/pg_navy</item>
+        <item name="iconTint">@color/pg_accent</item>
+        <item name="android:elevation">1dp</item>
+    </style>
+</resources>

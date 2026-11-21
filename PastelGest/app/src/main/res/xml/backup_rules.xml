@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A cópia automática do Android está desactivada (dados financeiros);
+     use Definições > Cópia de segurança. -->
+<full-backup-content>
+    <exclude domain="root" path="." />
+</full-backup-content>

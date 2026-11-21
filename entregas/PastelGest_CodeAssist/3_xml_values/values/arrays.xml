@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="payment_methods">
+        <item>Dinheiro</item>
+        <item>Multicaixa Express</item>
+        <item>Transferência</item>
+        <item>TPA (cartão)</item>
+        <item>Outro</item>
+    </string-array>
+    <string-array name="unit_types">
+        <item>Massa (kg / g)</item>
+        <item>Volume (litro / ml)</item>
+        <item>Unidade</item>
+    </string-array>
+    <string-array name="theme_options">
+        <item>Seguir o sistema</item>
+        <item>Claro</item>
+        <item>Escuro</item>
+    </string-array>
+    <string-array name="ingredient_categories">
+        <item>Farinhas</item>
+        <item>Açúcares</item>
+        <item>Lacticínios</item>
+        <item>Ovos</item>
+        <item>Gorduras</item>
+        <item>Recheios</item>
+        <item>Fermentos</item>
+        <item>Embalagens</item>
+        <item>Outros</item>
+    </string-array>
+</resources>

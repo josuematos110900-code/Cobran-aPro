@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="pg_radius">18dp</dimen>
+    <dimen name="pg_elevation">2dp</dimen>
+    <dimen name="pg_gutter">16dp</dimen>
+    <dimen name="pg_gap">10dp</dimen>
+    <dimen name="pg_icon_box">42dp</dimen>
+</resources>

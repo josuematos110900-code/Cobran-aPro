@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="pg_navy">#93C5FD</color>
+    <color name="pg_navy_soft">#BFDBFE</color>
+    <color name="pg_accent">#60A5FA</color>
+    <color name="pg_accent_soft">#1E3A5F</color>
+    <color name="pg_green">#4ADE80</color>
+    <color name="pg_green_soft">#14361F</color>
+    <color name="pg_red">#F87171</color>
+    <color name="pg_red_soft">#3B1515</color>
+    <color name="pg_orange">#FBBF24</color>
+    <color name="pg_orange_soft">#3A2A0A</color>
+    <color name="pg_white">#FFFFFF</color>
+
+    <color name="pg_bg">#0A0F1A</color>
+    <color name="pg_card">#E6182233</color>
+    <color name="pg_card_solid">#162032</color>
+    <color name="pg_card_stroke">#1FFFFFFF</color>
+    <color name="pg_text">#F1F5F9</color>
+    <color name="pg_text_secondary">#94A3B8</color>
+    <color name="pg_divider">#26FFFFFF</color>
+    <color name="pg_nav_bg">#F0111827</color>
+    <color name="pg_header_start">#0B1730</color>
+    <color name="pg_header_end">#13315C</color>
+    <color name="pg_on_header">#FFFFFF</color>
+    <color name="pg_chart_sales">#60A5FA</color>
+    <color name="pg_chart_profit">#4ADE80</color>
+    <color name="pg_chart_grid">#2694A3B8</color>
+</resources>
