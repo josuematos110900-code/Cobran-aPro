@@ -27,7 +27,6 @@
 ```bash
 ./gradlew assembleDebug        # Windows: gradlew.bat assembleDebug
 # APK em app/build/outputs/apk/debug/app-debug.apk
-./gradlew testDebugUnitTest    # executa os 25 testes JUnit da lógica de cálculo
 ```
 
 ### APK para distribuir (release)
@@ -39,7 +38,7 @@
 ## Se o Android Studio sugerir actualizações
 
 * *"Upgrade Android Gradle Plugin"*: pode aceitar o **AGP Upgrade Assistant**. O projecto não usa APIs obsoletas do AGP.
-* Se actualizar para `compileSdk 35` ou superior, altere também `targetSdk` em `app/build.gradle` e teste o ecrã em modo *edge-to-edge* (Android 15).
+* Se actualizar para `compileSdk 35` ou superior, altere também `targetSdk` em `app/build.gradle` e confirme o ecrã em modo *edge-to-edge* (Android 15).
 
 ## Problemas frequentes
 

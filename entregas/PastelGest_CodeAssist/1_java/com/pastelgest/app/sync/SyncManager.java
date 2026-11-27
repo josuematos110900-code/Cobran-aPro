@@ -76,7 +76,7 @@ public class SyncManager {
         this(c, new SupabaseClient(c.getApplicationContext()), new AuthManager(c.getApplicationContext()));
     }
 
-    /** Construtor com dependências injectáveis (usado nos testes de sincronização). */
+    /** Construtor com dependências injectáveis (permite substituir o cliente HTTP ou a autenticação). */
     public SyncManager(Context c, SupabaseClient client, AuthManager auth) {
         this.ctx = c.getApplicationContext();
         this.db = AppDatabase.get(ctx);

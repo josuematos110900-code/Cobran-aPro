@@ -41,7 +41,7 @@ public final class SyncScheduler {
                     .build();
             WorkManager.getInstance(c).enqueueUniqueWork(NOW, ExistingWorkPolicy.KEEP, req);
         } catch (IllegalStateException ignored) {
-            // WorkManager não inicializado (ex.: testes): a sincronização periódica tratará do envio.
+            // WorkManager ainda não inicializado: a sincronização periódica tratará do envio.
         }
     }
 

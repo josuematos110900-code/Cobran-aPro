@@ -28,7 +28,7 @@ Aplicação Android nativa em **Java + XML**, **offline-first**, com base de dad
 │ StockService: única porta de alteração de stock (movimentações imutáveis, custo médio)      │
 └───────────────┬──────────────────────────────────────────┬──────────────────────────────────┘
                 │                                          │
-┌───────────────▼──────── core (Java puro, testado) ──┐   ┌▼──────────── sync ──────────────────┐
+┌───────────────▼──────── core (Java puro) ───────────┐   ┌▼──────────── sync ──────────────────┐
 │ Money (Kz em cêntimos) · Units (kg/g, l/ml, un)     │   │ SupabaseClient (HTTP) · AuthManager │
 │ CostMath (custo médio) · RecipeCostCalculator       │   │ SyncManager (push/pull, LWW)        │
 │ ProductionPlanner · ProfitCalculator · Period       │   │ SyncWorker + SyncScheduler (rede)   │
@@ -103,10 +103,7 @@ PastelGest/
 │       │   ├── values/      colors, themes, strings (158), arrays, dimens, supabase_config
 │       │   ├── values-night/colors.xml    modo escuro
 │       │   ├── menu/ mipmap-anydpi-v26/ xml/ (FileProvider, regras de backup)
-│       └── test/java/…/core/   (7)  testes JUnit da lógica de cálculo
 ├── supabase/pastelgest_schema.sql        esquema completo + RLS + triggers
-├── verificacao/                           scripts de verificação (ver docs/TESTES.md)
-├── docs/TESTES.md                         testes realizados, resultados e limitações
 ├── docs/ANDROID_STUDIO.md                 guia passo a passo para o Android Studio
 └── docs/CODEASSIST.md                     guia passo a passo para o CodeAssist
 ```
@@ -157,9 +154,14 @@ Basta *File › Open* e escolher a pasta `PastelGest`. Guia completo: **[docs/AN
 
 ---
 
-## 7. O que deve configurar ou saber
+## 7. Limitações conhecidas
 
-Ver a secção **Limitações** de [docs/TESTES.md](docs/TESTES.md). Resumo:
-* Esta entrega **não foi compilada com o Android SDK** (indisponível neste ambiente). Foi compilada contra a framework Android 14 real, com stubs das bibliotecas AndroidX. A primeira compilação no CodeAssist pode revelar pequenos ajustes.
-* O CodeAssist tem de executar o *annotation processor* do Room (`room-compiler`).
-* Os comprovativos gerados pela app **não são facturas fiscais**. Para facturação legal em Angola é necessário software certificado pela AGT.
+1. **Primeira compilação:** o projecto ainda não foi compilado com o Android SDK. Se o Android Studio ou o CodeAssist indicarem algum erro, deverá ser pontual.
+2. **Room:** o `room-compiler` (annotationProcessor) tem de correr na compilação para gerar `AppDatabase_Impl`.
+3. **Interface:** ainda não foi experimentada num telemóvel real.
+4. **Fotografias, logótipo e comprovativos de despesas** ficam só no dispositivo onde foram escolhidos. Os caminhos sincronizam, mas as imagens não (não há upload para o Supabase Storage).
+5. **Conflitos:** a regra é *last-write-wins* por registo. Se dois dispositivos editarem o mesmo documento offline, prevalece a edição mais recente. Movimentos, pagamentos e auditoria são aditivos e nunca se perdem.
+6. **Contas:** os dispositivos da pastelaria partilham uma conta Supabase. Não há perfis de funcionário com permissões diferentes.
+7. **Produções confirmadas não são anuláveis.** Os erros corrigem-se com ajustes de inventário ou desperdícios, que ficam auditados.
+8. **Dados locais:** estão protegidos pelo isolamento do Android, `allowBackup=false` e o PIN. A base de dados não está cifrada (não usa SQLCipher).
+9. **Comprovativos ≠ factura fiscal.** Em Angola, a facturação legal exige software certificado pela AGT.

@@ -38,7 +38,6 @@ Há duas formas de o fazer:
 | `5_manifest/AndroidManifest.xml` | `app/src/main/AndroidManifest.xml` (substituir) |
 | `6_configuracao/app_build.gradle` | `app/build.gradle` (substituir) |
 | `6_configuracao/settings.gradle`, `build.gradle`, `gradle.properties` | raiz do projecto |
-| `7_testes/**` | `app/src/test/java/**` (opcional) |
 | `8_supabase/pastelgest_schema.sql` | **não vai para o telemóvel**: execute-o no Supabase |
 
 4. Mantenha **exactamente** a estrutura de pastas Java (`com/pastelgest/app/...`). Os `package` dos ficheiros dependem dela.
