@@ -78,7 +78,7 @@ Aplicação Android nativa em **Java + XML**, **offline-first**, com base de dad
 
 ```
 PastelGest/
-├── settings.gradle, build.gradle, gradle.properties, gradle/wrapper/gradle-wrapper.properties
+├── settings.gradle, build.gradle, gradle.properties, gradlew, gradlew.bat, gradle/wrapper/
 ├── app/
 │   ├── build.gradle                       dependências e configuração Android
 │   ├── proguard-rules.pro
@@ -107,6 +107,7 @@ PastelGest/
 ├── supabase/pastelgest_schema.sql        esquema completo + RLS + triggers
 ├── verificacao/                           scripts de verificação (ver docs/TESTES.md)
 ├── docs/TESTES.md                         testes realizados, resultados e limitações
+├── docs/ANDROID_STUDIO.md                 guia passo a passo para o Android Studio
 └── docs/CODEASSIST.md                     guia passo a passo para o CodeAssist
 ```
 
@@ -121,10 +122,9 @@ Na raiz do repositório existem também:
 ### CodeAssist (Android)
 Siga **[docs/CODEASSIST.md](docs/CODEASSIST.md)**.
 
-### Android Studio (alternativa)
-1. *File › Open* e seleccionar a pasta `PastelGest`.
-2. Se pedir o Gradle Wrapper: *File › Settings › Build › Gradle* e escolher "Gradle 8.7", ou correr `gradle wrapper --gradle-version 8.7` com um Gradle local.
-3. *Build › Make Project* e depois *Run*.
+### Android Studio
+O projecto inclui o Gradle Wrapper completo (`gradlew`, `gradlew.bat`, `gradle-wrapper.jar`; Gradle 8.9, AGP 8.7.3).
+Basta *File › Open* e escolher a pasta `PastelGest`. Guia completo: **[docs/ANDROID_STUDIO.md](docs/ANDROID_STUDIO.md)**.
 
 ---
 

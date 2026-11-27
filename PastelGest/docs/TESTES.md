@@ -58,4 +58,4 @@ Durante os testes encontrei e corrigi, além dos estilos XML:
 7. **Produções confirmadas não são anuláveis.** Os erros corrigem-se com ajustes de inventário ou desperdícios, que ficam auditados.
 8. **Dados locais:** estão protegidos pelo isolamento do Android, `allowBackup=false` e o PIN. A base de dados não está cifrada (não usa SQLCipher).
 9. **Comprovativos ≠ factura fiscal.** Em Angola, a facturação legal exige software certificado pela AGT.
-10. **Gradle Wrapper:** inclui `gradle-wrapper.properties` mas não o `gradle-wrapper.jar` (binário), que o Android Studio gera automaticamente. O CodeAssist não precisa dele.
+10. **Gradle Wrapper:** incluído e testado (`./gradlew --version` descarrega e arranca o Gradle 8.9; o projecto é lido correctamente). A resolução do Android Gradle Plugin 8.7.3 não pôde ser testada aqui porque o Google Maven está bloqueado neste ambiente.
